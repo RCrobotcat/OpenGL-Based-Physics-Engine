@@ -53,6 +53,7 @@ link_directories(${PROJECT_SOURCE_DIR}/dependencies/lib)
 
 # 链接库
 target_link_libraries(IF_Physics PRIVATE
+        Physics3D
         # 第三方库
         ${PROJECT_SOURCE_DIR}/dependencies/lib/libassimpd.dll.a
         ${PROJECT_SOURCE_DIR}/dependencies/lib/libglfw3.a

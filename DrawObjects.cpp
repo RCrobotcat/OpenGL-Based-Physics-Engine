@@ -5,9 +5,16 @@
 #include <cmath>
 #include <vector>
 
-#include "glad/glad.h"
+#include <glad/glad.h>
+#include <GLFW/glfw3.h>
+
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+
+#include "Model.h"
+#include "Shader.h"
 #include "glm/vec2.hpp"
-#include "glm/vec3.hpp"
 
 // renders (and builds at first invocation) a sphere
 // -------------------------------------------------
@@ -219,7 +226,9 @@ void renderQuad()
 unsigned int planeVAO = 0;
 unsigned int planeVBO = 0;
 
-void renderPlane()
+// half-extent: plane spans [-size, size]
+// UV is tiled by `uvScale` times(how many times the texture repeats)
+void renderPlane(float size = 10.0f, float uvScale = 25.0f)
 {
     if (planeVAO == 0)
     {
@@ -227,11 +236,8 @@ void renderPlane()
         // layout: position (3) + normal (3) + uv (2) = 8 floats
         // Plane is on XZ, normal points up (0,1,0)
         // UV is tiled by `uvScale` times.
-        const float size = 50.0f; // half-extent: plane spans [-size, size]
-        const float uvScale = 25.0f; // how many times the texture repeats
-
         float planeVertices[] = {
-            // positions                 // normals         // texcoords
+            // positions        // normals        // texcoords
             -size, 0.0f, -size, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f,
             size, 0.0f, -size, 0.0f, 1.0f, 0.0f, uvScale, 0.0f,
             size, 0.0f, size, 0.0f, 1.0f, 0.0f, uvScale, uvScale,
@@ -265,4 +271,70 @@ void renderPlane()
     glBindVertexArray(planeVAO);
     glDrawArrays(GL_TRIANGLES, 0, 6);
     glBindVertexArray(0);
+}
+
+// lights
+// ------
+glm::vec3 lightPositions[] = {
+    glm::vec3(-10.0f, 10.0f, 10.0f),
+    glm::vec3(10.0f, 10.0f, 10.0f),
+    glm::vec3(-10.0f, -10.0f, 10.0f),
+    glm::vec3(10.0f, -10.0f, 10.0f),
+};
+glm::vec3 lightColors[] = {
+    glm::vec3(300.0f, 300.0f, 300.0f),
+    glm::vec3(300.0f, 300.0f, 300.0f),
+    glm::vec3(300.0f, 300.0f, 300.0f),
+    glm::vec3(300.0f, 300.0f, 300.0f)
+};
+
+void renderLights(Shader &pbrShader, glm::mat4 &model, unsigned int AlbedoMap, unsigned int NormalMap,
+                  unsigned int MetallicMap, unsigned int RoughnessMap, unsigned int AOMap)
+{
+    // render light source (simply re-render sphere at light positions)
+    // this looks a bit off as we use the same shader, but it'll make their positions obvious and
+    // keeps the codeprint small.
+    glActiveTexture(GL_TEXTURE3);
+    glBindTexture(GL_TEXTURE_2D, AlbedoMap);
+    glActiveTexture(GL_TEXTURE4);
+    glBindTexture(GL_TEXTURE_2D, NormalMap);
+    glActiveTexture(GL_TEXTURE5);
+    glBindTexture(GL_TEXTURE_2D, MetallicMap);
+    glActiveTexture(GL_TEXTURE6);
+    glBindTexture(GL_TEXTURE_2D, RoughnessMap);
+    glActiveTexture(GL_TEXTURE7);
+    glBindTexture(GL_TEXTURE_2D, AOMap);
+    for (unsigned int i = 0; i < sizeof(lightPositions) / sizeof(lightPositions[0]); ++i)
+    {
+        glm::vec3 newPos = lightPositions[i] + glm::vec3(sin(glfwGetTime() * 5.0) * 5.0, 0.0, 0.0);
+        newPos = lightPositions[i];
+        pbrShader.setVec3("lightPositions[" + std::to_string(i) + "]", newPos);
+        pbrShader.setVec3("lightColors[" + std::to_string(i) + "]", lightColors[i]);
+
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, newPos);
+        model = glm::scale(model, glm::vec3(0.5f));
+        pbrShader.setMat4("model", model);
+        pbrShader.setMat3("normalMatrix", glm::transpose(glm::inverse(glm::mat3(model))));
+        renderSphere();
+    }
+}
+
+void renderModel(Shader &pbrShader, Model objectModel, glm::mat4 &model, unsigned int AlbedoMap, unsigned int NormalMap,
+                 unsigned int MetallicMap, unsigned int RoughnessMap, unsigned int AOMap)
+{
+    glActiveTexture(GL_TEXTURE3);
+    glBindTexture(GL_TEXTURE_2D, AlbedoMap);
+    glActiveTexture(GL_TEXTURE4);
+    glBindTexture(GL_TEXTURE_2D, NormalMap);
+    glActiveTexture(GL_TEXTURE5);
+    glBindTexture(GL_TEXTURE_2D, MetallicMap);
+    glActiveTexture(GL_TEXTURE6);
+    glBindTexture(GL_TEXTURE_2D, RoughnessMap);
+    glActiveTexture(GL_TEXTURE7);
+    glBindTexture(GL_TEXTURE_2D, AOMap);
+
+    pbrShader.setMat4("model", model);
+    pbrShader.setMat3("normalMatrix", glm::transpose(glm::inverse(glm::mat3(model))));
+    objectModel.Draw(pbrShader);
 }

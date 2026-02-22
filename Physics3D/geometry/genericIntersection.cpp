@@ -286,13 +286,11 @@ bool runEPATransformed(const ColissionPair& info, const Tetrahedron& s, Vec3f& i
 
 			// intersection = (avgFirst + relativeCFrame.localToGlobal(avgSecond)) / 2;
 			intersection = (avgFirst + avgSecond) * 0.5f;
-			incDebugTally(EPAIterationStatistics, iter);
+
 			return true;
 		}
 	}
 
-	Debug::logWarn("EPA iteration limit exceeded! ");
-	incDebugTally(EPAIterationStatistics, EPA_MAX_ITER);
 	return false;
 }
 };

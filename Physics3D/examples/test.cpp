@@ -247,7 +247,7 @@ public:
     {
         glGenVertexArrays(1, &vertexArrayID);
         glBindVertexArray(vertexArrayID);
-        // benerate buffers
+        // generate buffers
         GLuint buffers[2];
         glGenBuffers(2, buffers);
         vertexBuffer = buffers[0];

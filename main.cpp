@@ -6,14 +6,9 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #include <iostream>
-#include <valarray>
 #include "Shader.h"
 
 #define STB_IMAGE_IMPLEMENTATION
-
-#include <map>
-#include <random>
-
 #include "Camera.h"
 #include "Model.h"
 #include "stb_image.h"
@@ -23,6 +18,48 @@
 #include "imgui/imgui.h"
 #include "imgui/imgui_impl_glfw.h"
 #include "imgui/imgui_impl_opengl3.h"
+
+#include <Physics3D/math/linalg/vec.h>
+#include <Physics3D/math/linalg/mat.h>
+#include <Physics3D/part.h>
+#include <Physics3D/world.h>
+#include <Physics3D/worldIteration.h>
+#include <Physics3D/geometry/shapeCreation.h>
+#include <Physics3D/geometry/shapeLibrary.h>
+#include <Physics3D/threading/physicsThread.h>
+#include <Physics3D/externalforces/directionalGravity.h>
+
+using namespace P3D;
+
+// Helper to convert Physics3D Mat4f to glm::mat4
+template<typename T>
+glm::mat4 toGlm(const Matrix<T, 4, 4> &mat)
+{
+    glm::mat4 result;
+    float data[16];
+    Matrix<float, 4, 4>(mat).toColMajorData(data);
+    memcpy(glm::value_ptr(result), data, 16 * sizeof(float));
+    return result;
+}
+
+// Custom Part to hold rendering info
+class CustomPart : public Part
+{
+public:
+    enum Type { SPHERE, CUBE, PLANE, MODEL };
+
+    Type type;
+
+    // For textured parts, we might want to store which texture set to use.
+    // simpler for this demo: just an index
+    int materialIndex;
+
+    CustomPart(const Shape &shape, const GlobalCFrame &position, const PartProperties &properties, Type type,
+               int materialIndex = 0)
+        : Part(shape, position, properties), type(type), materialIndex(materialIndex)
+    {
+    }
+};
 
 void mouse_callback(GLFWwindow *window, double xpos, double ypos);
 
@@ -34,17 +71,20 @@ void processInput(GLFWwindow *window);
 
 unsigned int loadTexture(const char *path);
 
-const unsigned int SCR_WIDTH = 1280;
-const unsigned int SCR_HEIGHT = 720;
+const unsigned int SCR_WIDTH = 1920;
+const unsigned int SCR_HEIGHT = 1080;
 
 // Camera
-Camera camera(glm::vec3(5.0f, 5.0f, 5.0f));
+Camera camera(glm::vec3(-22, 5.0f, 35.0f));
 float lastX = SCR_WIDTH / 2.0f;
 float lastY = SCR_HEIGHT / 2.0f;
 bool firstMouse = true;
 
 float deltaTime = 0.0f; // 当前帧与上一帧的时间差
 float lastFrame = 0.0f; // 上一帧的时间
+
+float floorSize = 100.0f;
+float floorUVScale = 25.0f; // Tiling factor for floor texture
 
 int main()
 {
@@ -173,31 +213,117 @@ int main()
     unsigned int wallAOMap = loadTexture("../Textures/wall/ao.png");
 
     // model
-    unsigned int modelAlbedoMap = loadTexture(
-        "../models/Cerberus_by_Andrew_Maximov/Textures/Cerberus_A.tga");
-    unsigned int modelNormalMap = loadTexture(
-        "../models/Cerberus_by_Andrew_Maximov/Textures/Cerberus_N.tga");
-    unsigned int modelMetallicMap = loadTexture(
-        "../models/Cerberus_by_Andrew_Maximov/Textures/Cerberus_M.tga");
-    unsigned int modelRoughnessMap = loadTexture(
-        "../models/Cerberus_by_Andrew_Maximov/Textures/Cerberus_R.tga");
-    unsigned int modelAOMap = loadTexture(
-        "../models/Cerberus_by_Andrew_Maximov/Textures/Raw/Cerberus_AO.tga");
+    // unsigned int modelAlbedoMap = loadTexture(
+    //     "../models/Cerberus_by_Andrew_Maximov/Textures/Cerberus_A.tga");
+    // unsigned int modelNormalMap = loadTexture(
+    //     "../models/Cerberus_by_Andrew_Maximov/Textures/Cerberus_N.tga");
+    // unsigned int modelMetallicMap = loadTexture(
+    //     "../models/Cerberus_by_Andrew_Maximov/Textures/Cerberus_M.tga");
+    // unsigned int modelRoughnessMap = loadTexture(
+    //     "../models/Cerberus_by_Andrew_Maximov/Textures/Cerberus_R.tga");
+    // unsigned int modelAOMap = loadTexture(
+    //     "../models/Cerberus_by_Andrew_Maximov/Textures/Raw/Cerberus_AO.tga");
 
-    // lights
-    // ------
-    glm::vec3 lightPositions[] = {
-        glm::vec3(-10.0f, 10.0f, 10.0f),
-        glm::vec3(10.0f, 10.0f, 10.0f),
-        glm::vec3(-10.0f, -10.0f, 10.0f),
-        glm::vec3(10.0f, -10.0f, 10.0f),
+    // Physics World Setup
+    // -------------------
+    World<CustomPart> world(1.0 / 60.0);
+    UpgradeableMutex worldMutex;
+
+    PartProperties basicProperties;
+    basicProperties.density = 1.0;
+    basicProperties.friction = 0.5;
+    basicProperties.bouncyness = 0.05;
+
+    // Floor
+    std::unique_ptr<CustomPart> floor = std::make_unique<CustomPart>(
+        boxShape(floorSize * 2, 1.0, floorSize * 2),
+        GlobalCFrame(0.0, -10.0 - 0.5, 0.0),
+        // -0.5 to align top surface to -10.0 (renderPlane is at y=0 local, so -10 global)
+        basicProperties,
+        CustomPart::PLANE,
+        4 // Wall texture index
+    );
+    world.addTerrainPart(floor.get());
+
+    // Spheres
+    // Positions from original code: (-5, 0, 2), (-3, 0, 2), (-1, 0, 2), (1, 0, 2), (3, 0, 2)
+    struct SphereInit
+    {
+        double x, y, z;
+        int materialIndex;
     };
-    glm::vec3 lightColors[] = {
-        glm::vec3(300.0f, 300.0f, 300.0f),
-        glm::vec3(300.0f, 300.0f, 300.0f),
-        glm::vec3(300.0f, 300.0f, 300.0f),
-        glm::vec3(300.0f, 300.0f, 300.0f)
+    std::vector<SphereInit> sphereInits = {
+        {-5.0, 10.0, 2.0, 0}, // Iron
+        {-3.0, 12.0, 2.0, 1}, // Gold
+        {-1.0, 14.0, 2.0, 2}, // Grass
+        {1.0, 16.0, 2.0, 3}, // Plastic
+        {3.0, 18.0, 2.0, 4} // Wall
     };
+
+    struct BoxInit
+    {
+        double x, y, z;
+        int materialIndex;
+    };
+    std::vector<BoxInit> boxInits = {
+        {-4.0, 10.0, 5.0, 0}, // Iron
+        {-2.0, 12.0, 5.0, 1}, // Gold
+        {0.0, 14.0, 5.0, 2}, // Grass
+        {2.0, 16.0, 5.0, 3}, // Plastic
+        {4.0, 18.0, 5.0, 4} // Wall
+    };
+
+    std::vector<std::unique_ptr<CustomPart>> parts;
+
+    // add spheres
+    for (const auto &s: sphereInits)
+    {
+        auto part = std::make_unique<CustomPart>(
+            sphereShape(1.0),
+            GlobalCFrame(s.x, s.y, s.z),
+            basicProperties,
+            CustomPart::SPHERE,
+            s.materialIndex
+        );
+        world.addPart(part.get());
+        parts.push_back(std::move(part));
+    }
+
+    // add boxes
+    for (const auto &b: boxInits)
+    {
+        auto part = std::make_unique<CustomPart>(
+            boxShape(2.0, 2.0, 2.0),
+            GlobalCFrame(b.x, b.y, b.z),
+            basicProperties,
+            CustomPart::CUBE,
+            b.materialIndex
+        );
+        world.addPart(part.get());
+        parts.push_back(std::move(part));
+    }
+
+    // Gun Model (Dynamics)
+    // Approximated as a box for physics
+    // auto gunPart = std::make_unique<CustomPart>(
+    //     boxShape(0.1, 0.1, 0.3), // Approximate size
+    //     GlobalCFrame(0.0, 20.0, 10.0, Rotation::fromEulerAngles(0.2, 0.1, 0.3)),
+    //     basicProperties,
+    //     CustomPart::MODEL, // Mark as model
+    //     0 // Texture index doesn't matter for model as it has its own
+    // );
+    // // Make gun lighter so it bounces more funnily?
+    // gunPart->properties.density = 0.5;
+    // world.addPart(gunPart.get());
+    // parts.push_back(std::move(gunPart));
+
+    // Gravity
+    DirectionalGravity gravity(Vec3(0.0, -9.81, 0.0));
+    world.addExternalForce(&gravity);
+
+    // Physics Thread
+    PhysicsThread physicsThread(&world, &worldMutex);
+    physicsThread.start();
 
     // pbr: setup framebuffer
     // ----------------------
@@ -413,7 +539,7 @@ int main()
     // initialize static shader uniforms before rendering
     // --------------------------------------------------
     glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float) SCR_WIDTH / (float) SCR_HEIGHT, 0.1f,
-                                            100.0f);
+                                            1000.0f);
     pbrShader.use();
     pbrShader.setMat4("projection", projection);
     backgroundShader.use();
@@ -423,7 +549,6 @@ int main()
     int scrWidth, scrHeight;
     glfwGetFramebufferSize(window, &scrWidth, &scrHeight);
     glViewport(0, 0, scrWidth, scrHeight);
-
 
     while (!glfwWindowShouldClose(window))
     {
@@ -488,162 +613,90 @@ int main()
         glActiveTexture(GL_TEXTURE2);
         glBindTexture(GL_TEXTURE_2D, brdfLUTTexture);
 
-        // rusted iron
-        glActiveTexture(GL_TEXTURE3);
-        glBindTexture(GL_TEXTURE_2D, ironAlbedoMap);
-        glActiveTexture(GL_TEXTURE4);
-        glBindTexture(GL_TEXTURE_2D, ironNormalMap);
-        glActiveTexture(GL_TEXTURE5);
-        glBindTexture(GL_TEXTURE_2D, ironMetallicMap);
-        glActiveTexture(GL_TEXTURE6);
-        glBindTexture(GL_TEXTURE_2D, ironRoughnessMap);
-        glActiveTexture(GL_TEXTURE7);
-        glBindTexture(GL_TEXTURE_2D, ironAOMap);
-
-        model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(-5.0, 0.0, 2.0));
-        pbrShader.setMat4("model", model);
-        pbrShader.setMat3("normalMatrix", glm::transpose(glm::inverse(glm::mat3(model))));
-        renderSphere();
-
-        // gold
-        glActiveTexture(GL_TEXTURE3);
-        glBindTexture(GL_TEXTURE_2D, goldAlbedoMap);
-        glActiveTexture(GL_TEXTURE4);
-        glBindTexture(GL_TEXTURE_2D, goldNormalMap);
-        glActiveTexture(GL_TEXTURE5);
-        glBindTexture(GL_TEXTURE_2D, goldMetallicMap);
-        glActiveTexture(GL_TEXTURE6);
-        glBindTexture(GL_TEXTURE_2D, goldRoughnessMap);
-        glActiveTexture(GL_TEXTURE7);
-        glBindTexture(GL_TEXTURE_2D, goldAOMap);
-
-        model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(-3.0, 0.0, 2.0));
-        pbrShader.setMat4("model", model);
-        pbrShader.setMat3("normalMatrix", glm::transpose(glm::inverse(glm::mat3(model))));
-        renderSphere();
-
-        // grass
-        glActiveTexture(GL_TEXTURE3);
-        glBindTexture(GL_TEXTURE_2D, grassAlbedoMap);
-        glActiveTexture(GL_TEXTURE4);
-        glBindTexture(GL_TEXTURE_2D, grassNormalMap);
-        glActiveTexture(GL_TEXTURE5);
-        glBindTexture(GL_TEXTURE_2D, grassMetallicMap);
-        glActiveTexture(GL_TEXTURE6);
-        glBindTexture(GL_TEXTURE_2D, grassRoughnessMap);
-        glActiveTexture(GL_TEXTURE7);
-        glBindTexture(GL_TEXTURE_2D, grassAOMap);
-
-        model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(-1.0, 0.0, 2.0));
-        pbrShader.setMat4("model", model);
-        pbrShader.setMat3("normalMatrix", glm::transpose(glm::inverse(glm::mat3(model))));
-        renderSphere();
-
-        // plastic
-        glActiveTexture(GL_TEXTURE3);
-        glBindTexture(GL_TEXTURE_2D, plasticAlbedoMap);
-        glActiveTexture(GL_TEXTURE4);
-        glBindTexture(GL_TEXTURE_2D, plasticNormalMap);
-        glActiveTexture(GL_TEXTURE5);
-        glBindTexture(GL_TEXTURE_2D, plasticMetallicMap);
-        glActiveTexture(GL_TEXTURE6);
-        glBindTexture(GL_TEXTURE_2D, plasticRoughnessMap);
-        glActiveTexture(GL_TEXTURE7);
-        glBindTexture(GL_TEXTURE_2D, plasticAOMap);
-
-        model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(1.0, 0.0, 2.0));
-        pbrShader.setMat4("model", model);
-        pbrShader.setMat3("normalMatrix", glm::transpose(glm::inverse(glm::mat3(model))));
-        renderSphere();
-
-        // wall
-        glActiveTexture(GL_TEXTURE3);
-        glBindTexture(GL_TEXTURE_2D, wallAlbedoMap);
-        glActiveTexture(GL_TEXTURE4);
-        glBindTexture(GL_TEXTURE_2D, wallNormalMap);
-        glActiveTexture(GL_TEXTURE5);
-        glBindTexture(GL_TEXTURE_2D, wallMetallicMap);
-        glActiveTexture(GL_TEXTURE6);
-        glBindTexture(GL_TEXTURE_2D, wallRoughnessMap);
-        glActiveTexture(GL_TEXTURE7);
-        glBindTexture(GL_TEXTURE_2D, wallAOMap);
-
-        model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(3.0, 0.0, 2.0));
-        pbrShader.setMat4("model", model);
-        pbrShader.setMat3("normalMatrix", glm::transpose(glm::inverse(glm::mat3(model))));
-        renderSphere();
-
-        // ---- floor plane ----
-        glActiveTexture(GL_TEXTURE3);
-        glBindTexture(GL_TEXTURE_2D, wallAlbedoMap); // 你也可以换 grass
-        glActiveTexture(GL_TEXTURE4);
-        glBindTexture(GL_TEXTURE_2D, wallNormalMap);
-        glActiveTexture(GL_TEXTURE5);
-        glBindTexture(GL_TEXTURE_2D, wallMetallicMap);
-        glActiveTexture(GL_TEXTURE6);
-        glBindTexture(GL_TEXTURE_2D, wallRoughnessMap);
-        glActiveTexture(GL_TEXTURE7);
-        glBindTexture(GL_TEXTURE_2D, wallAOMap);
-
-        glm::mat4 floorModel = glm::mat4(1.0f);
-        floorModel = glm::translate(floorModel, glm::vec3(0.0f, -15.0f, 0.0f));
-        pbrShader.setMat4("model", floorModel);
-        pbrShader.setMat3("normalMatrix", glm::transpose(glm::inverse(glm::mat3(floorModel))));
-        renderPlane();
-
-        // gun model
-        glActiveTexture(GL_TEXTURE3);
-        glBindTexture(GL_TEXTURE_2D, modelAlbedoMap);
-        glActiveTexture(GL_TEXTURE4);
-        glBindTexture(GL_TEXTURE_2D, modelNormalMap);
-        glActiveTexture(GL_TEXTURE5);
-        glBindTexture(GL_TEXTURE_2D, modelMetallicMap);
-        glActiveTexture(GL_TEXTURE6);
-        glBindTexture(GL_TEXTURE_2D, modelRoughnessMap);
-        glActiveTexture(GL_TEXTURE7);
-        glBindTexture(GL_TEXTURE_2D, modelAOMap);
-
-        glm::mat4 m = glm::mat4(1.0f);
-        m = glm::translate(m, glm::vec3(0.0f, 0.0f, 10.0f));
-        m = glm::scale(m, glm::vec3(0.3f));
-        m = glm::rotate(m, glm::radians(-90.0f), glm::vec3(1, 0, 0));
-        m = glm::rotate(m, glm::radians(90.0f), glm::vec3(0, 0, 1));
-        pbrShader.setMat4("model", m);
-        pbrShader.setMat3("normalMatrix", glm::transpose(glm::inverse(glm::mat3(m))));
-        gunModel.Draw(pbrShader);
-
-        // render light source (simply re-render sphere at light positions)
-        // this looks a bit off as we use the same shader, but it'll make their positions obvious and
-        // keeps the codeprint small.
-        glActiveTexture(GL_TEXTURE3);
-        glBindTexture(GL_TEXTURE_2D, plasticAlbedoMap);
-        glActiveTexture(GL_TEXTURE4);
-        glBindTexture(GL_TEXTURE_2D, plasticNormalMap);
-        glActiveTexture(GL_TEXTURE5);
-        glBindTexture(GL_TEXTURE_2D, plasticMetallicMap);
-        glActiveTexture(GL_TEXTURE6);
-        glBindTexture(GL_TEXTURE_2D, plasticRoughnessMap);
-        glActiveTexture(GL_TEXTURE7);
-        glBindTexture(GL_TEXTURE_2D, plasticAOMap);
-        for (unsigned int i = 0; i < sizeof(lightPositions) / sizeof(lightPositions[0]); ++i)
+        // Texture Bindings Array
+        struct TextureSet
         {
-            glm::vec3 newPos = lightPositions[i] + glm::vec3(sin(glfwGetTime() * 5.0) * 5.0, 0.0, 0.0);
-            newPos = lightPositions[i];
-            pbrShader.setVec3("lightPositions[" + std::to_string(i) + "]", newPos);
-            pbrShader.setVec3("lightColors[" + std::to_string(i) + "]", lightColors[i]);
+            unsigned int albedo, normal, metallic, roughness, ao;
+        };
+        TextureSet textures[] = {
+            {ironAlbedoMap, ironNormalMap, ironMetallicMap, ironRoughnessMap, ironAOMap}, // 0
+            {goldAlbedoMap, goldNormalMap, goldMetallicMap, goldRoughnessMap, goldAOMap}, // 1
+            {grassAlbedoMap, grassNormalMap, grassMetallicMap, grassRoughnessMap, grassAOMap}, // 2
+            {plasticAlbedoMap, plasticNormalMap, plasticMetallicMap, plasticRoughnessMap, plasticAOMap}, // 3
+            {wallAlbedoMap, wallNormalMap, wallMetallicMap, wallRoughnessMap, wallAOMap} // 4
+        };
 
-            model = glm::mat4(1.0f);
-            model = glm::translate(model, newPos);
-            model = glm::scale(model, glm::vec3(0.5f));
-            pbrShader.setMat4("model", model);
-            pbrShader.setMat3("normalMatrix", glm::transpose(glm::inverse(glm::mat3(model))));
-            renderSphere();
+        // Sync with physics world
+        {
+            std::shared_lock<UpgradeableMutex> lock(worldMutex);
+            world.forEachPart([&](const CustomPart &part)
+            {
+                // Determine textures
+                int matIdx = part.materialIndex;
+                if (matIdx >= 0 && matIdx < 5 && part.type != CustomPart::MODEL)
+                {
+                    glActiveTexture(GL_TEXTURE3);
+                    glBindTexture(GL_TEXTURE_2D, textures[matIdx].albedo);
+                    glActiveTexture(GL_TEXTURE4);
+                    glBindTexture(GL_TEXTURE_2D, textures[matIdx].normal);
+                    glActiveTexture(GL_TEXTURE5);
+                    glBindTexture(GL_TEXTURE_2D, textures[matIdx].metallic);
+                    glActiveTexture(GL_TEXTURE6);
+                    glBindTexture(GL_TEXTURE_2D, textures[matIdx].roughness);
+                    glActiveTexture(GL_TEXTURE7);
+                    glBindTexture(GL_TEXTURE_2D, textures[matIdx].ao);
+                }
+                // else if (part.type == CustomPart::MODEL)
+                // {
+                //     // Gun textures
+                //     glActiveTexture(GL_TEXTURE3);
+                //     glBindTexture(GL_TEXTURE_2D, modelAlbedoMap);
+                //     glActiveTexture(GL_TEXTURE4);
+                //     glBindTexture(GL_TEXTURE_2D, modelNormalMap);
+                //     glActiveTexture(GL_TEXTURE5);
+                //     glBindTexture(GL_TEXTURE_2D, modelMetallicMap);
+                //     glActiveTexture(GL_TEXTURE6);
+                //     glBindTexture(GL_TEXTURE_2D, modelRoughnessMap);
+                //     glActiveTexture(GL_TEXTURE7);
+                //     glBindTexture(GL_TEXTURE_2D, modelAOMap);
+                // }
+
+                // Transform
+                glm::mat4 m = toGlm(part.getCFrame().asMat4WithPreScale(part.hitbox.scale));
+
+                // Render
+                if (part.type == CustomPart::SPHERE)
+                {
+                    pbrShader.setMat4("model", m);
+                    pbrShader.setMat3("normalMatrix", glm::transpose(glm::inverse(glm::mat3(m))));
+                    renderSphere();
+                } else if (part.type == CustomPart::PLANE)
+                {
+                    glm::mat4 mNoScale = toGlm(part.getCFrame().asMat4());
+                    pbrShader.setMat4("model", mNoScale);
+                    pbrShader.setMat3("normalMatrix", glm::transpose(glm::inverse(glm::mat3(mNoScale))));
+                    renderPlane(floorSize, floorUVScale);
+                } else if (part.type == CustomPart::CUBE)
+                {
+                    pbrShader.setMat4("model", m);
+                    pbrShader.setMat3("normalMatrix", glm::transpose(glm::inverse(glm::mat3(m))));
+                    renderCube();
+                }
+                // else if (part.type == CustomPart::MODEL)
+                // {
+                //
+                // }
+            });
         }
+
+        // Gun textures
+        // glm::mat4 m = glm::mat4(1.0f);
+        // m = glm::translate(m, glm::vec3(0.0f, 0.0f, 10.0f));
+        // m = glm::scale(m, glm::vec3(0.3f));
+        // m = glm::rotate(m, glm::radians(-90.0f), glm::vec3(1, 0, 0));
+        // m = glm::rotate(m, glm::radians(90.0f), glm::vec3(0, 0, 1));
+        // renderModel(pbrShader, gunModel, m, modelAlbedoMap, modelNormalMap, modelMetallicMap, modelRoughnessMap,
+        //             modelAOMap);
 
         // render skybox (render as last to prevent overdraw)
         backgroundShader.use();
@@ -731,7 +784,7 @@ unsigned int loadTexture(char const *path)
     unsigned char *data = stbi_load(path, &width, &height, &nrComponents, 0);
     if (data)
     {
-        GLenum format;
+        GLenum format = GL_RED; // Default initialization
         if (nrComponents == 1)
             format = GL_RED;
         else if (nrComponents == 3)

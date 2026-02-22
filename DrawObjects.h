@@ -5,6 +5,7 @@
 #ifndef IF_PHYSICS_DRAWOBJECTS_H
 #define IF_PHYSICS_DRAWOBJECTS_H
 #include "glm/vec3.hpp"
+#include "Shader.h"
 
 #endif //IF_PHYSICS_DRAWOBJECTS_H
 
@@ -14,4 +15,10 @@ void renderCube();
 
 void renderQuad();
 
-void renderPlane();
+void renderPlane(float size = 10.0f, float uvScale = 25.0f);
+
+void renderLights(Shader &pbrShader, glm::mat4 &model, unsigned int AlbedoMap, unsigned int NormalMap,
+                  unsigned int MetallicMap, unsigned int RoughnessMap, unsigned int AOMap);
+
+void renderModel(Shader &pbrShader, Model objectModel, glm::mat4 &model, unsigned int AlbedoMap, unsigned int NormalMap,
+                  unsigned int MetallicMap, unsigned int RoughnessMap, unsigned int AOMap);

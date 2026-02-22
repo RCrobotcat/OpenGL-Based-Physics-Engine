@@ -35,7 +35,7 @@ Physical::Physical(RigidBody&& rigidBody, MotorizedPhysical* mainPhysical) : rig
 }
 
 Physical::Physical(Physical&& other) noexcept :
-	rigidBody(std::move(other.rigidBody)), 
+	rigidBody(std::move(other.rigidBody)),
 	mainPhysical(other.mainPhysical),
 	childPhysicals(std::move(other.childPhysicals)) {
 	this->rigidBody.mainPart->setRigidBodyPhysical(this);
@@ -52,7 +52,7 @@ Physical& Physical::operator=(Physical&& other) noexcept {
 	for(ConnectedPhysical& p : this->childPhysicals) {
 		p.parent = this;
 	}
-	
+
 	return *this;
 }
 
@@ -84,7 +84,7 @@ void Physical::makeMainPart(Part* newMainPart) {
 		return;
 	}
 	AttachedPart& atPart = rigidBody.getAttachFor(newMainPart);
-	
+
 	makeMainPart(atPart);
 }
 
@@ -113,7 +113,7 @@ static inline bool liesInVector(const std::vector<T>& vec, const T* ptr) {
 	OS is old location of S, which is now invalid and which will be replaced in the next iteration
 	P (for parent) is the old parent of S, to be moved to be a child of S
 	T (for trash) is the physical currently being replaced by P
-	
+
 	We wish to make S the new Main Physical
 
 	      M
@@ -132,7 +132,7 @@ static inline bool liesInVector(const std::vector<T>& vec, const T* ptr) {
 	 S        P
 	/|\      / \
 	   T   OS
-	
+
 	Copy P to T, reversing OS's attachment
 
 	 S
@@ -305,7 +305,7 @@ void Physical::attachPhysical(MotorizedPhysical* phys, const CFrame& attachment)
 
 	phys->rigidBody.mainPart->setRigidBodyPhysical(this);
 	this->rigidBody.attach(std::move(phys->rigidBody), attachment);
-	
+
 
 	for(ConnectedPhysical& conPhys : phys->childPhysicals) {
 		this->childPhysicals.push_back(std::move(conPhys));
@@ -358,7 +358,7 @@ void Physical::detachAllChildPhysicals() {
 	WorldPrototype* world = this->getWorld();
 	for(ConnectedPhysical& child : childPhysicals) {
 		MotorizedPhysical* newPhys = new MotorizedPhysical(std::move(static_cast<Physical&>(child)));
-		
+
 		if(world != nullptr) {
 			world->notifyPhysicalHasBeenSplit(this->mainPhysical, newPhys);
 		}
@@ -385,10 +385,10 @@ static void computeInternalRelativeMotionTree(MonotonicTreeBuilder<RelativeMotio
 	curNode.value = motionOfSelf.extendEnd(conPhys.rigidBody.localCenterOfMass);
 
 	std::size_t size = conPhys.childPhysicals.size();
-	
+
 	if(size == 0) {
 		curNode.children = nullptr;
-	} else { 
+	} else {
 		curNode.children = builder.alloc(size);
 		for(std::size_t i = 0; i < size; i++) {
 			computeInternalRelativeMotionTree(builder, curNode.children[i], conPhys.childPhysicals[i], motionOfSelf);
@@ -627,7 +627,7 @@ void MotorizedPhysical::fullRefreshOfConnectedPhysicals() {
 void MotorizedPhysical::update(double deltaT) {
 
 	Vec3 accel = forceResponse * totalForce * deltaT;
-	
+
 	Vec3 localMoment = getCFrame().relativeToLocal(totalMoment);
 	Vec3 localRotAcc = momentResponse * localMoment * deltaT;
 	Vec3 rotAcc = getCFrame().localToRelative(localRotAcc);
@@ -851,7 +851,7 @@ Vec3 MotorizedPhysical::getTotalAngularMomentum() const {
 	SymmetricMat3 totalInertia = selfRot.localToGlobal(cache.getInertia());
 	Vec3 localInternalAngularMomentum = cache.getInternalAngularMomentum();
 	Vec3 globalInternalAngularMomentum = selfRot.localToGlobal(localInternalAngularMomentum);
-	
+
 	Vec3 externalAngularMomentum = totalInertia * this->motionOfCenterOfMass.getAngularVelocity();
 
 	return externalAngularMomentum + globalInternalAngularMomentum;
@@ -1008,7 +1008,7 @@ bool Physical::isValid() const {
 }
 bool MotorizedPhysical::isValid() const {
 	assert(Physical::isValid());
-	
+
 	assert(isVecValid(totalForce));
 	assert(isVecValid(totalMoment));
 	assert(std::isfinite(totalMass));
