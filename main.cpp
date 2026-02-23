@@ -230,9 +230,9 @@ int main()
     UpgradeableMutex worldMutex;
 
     PartProperties basicProperties;
-    basicProperties.density = 1.0;
-    basicProperties.friction = 0.5;
-    basicProperties.bouncyness = 0.05;
+    basicProperties.density = 5.0;
+    basicProperties.friction = 0.8;
+    basicProperties.bouncyness = 0.01;
 
     // Floor
     std::unique_ptr<CustomPart> floor = std::make_unique<CustomPart>(
@@ -266,11 +266,11 @@ int main()
         int materialIndex;
     };
     std::vector<BoxInit> boxInits = {
-        {-4.0, 10.0, 5.0, 0}, // Iron
-        {-2.0, 12.0, 5.0, 1}, // Gold
-        {0.0, 14.0, 5.0, 2}, // Grass
-        {2.0, 16.0, 5.0, 3}, // Plastic
-        {4.0, 18.0, 5.0, 4} // Wall
+        {-4.0, 6.0, 5.0, 0}, // Iron
+        {-2.0, 8.0, 5.0, 1}, // Gold
+        {0.0, 10.0, 5.0, 2}, // Grass
+        {2.0, 12.0, 5.0, 3}, // Plastic
+        {4.0, 14.0, 5.0, 4} // Wall
     };
 
     std::vector<std::unique_ptr<CustomPart>> parts;
