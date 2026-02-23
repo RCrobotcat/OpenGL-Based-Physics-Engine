@@ -106,6 +106,8 @@ namespace P3D
         // line segment, check if line, or either point closer
         // B can't be closer since we picked a point towards the origin
         // Just one test, to see if the line segment or A is closer
+        // 点阶段：
+        // 往原点的方向找点，如果找不到比这个点更近的了，那就说明没有碰撞
         B = getSupport(info, searchDirection);
         if (B.p * searchDirection < 0)
         {
@@ -113,6 +115,8 @@ namespace P3D
             return std::optional<Tetrahedron>();
         }
 
+        // 线段阶段：
+        // 往线段和原点垂直的方向找点，如果找不到比这个点更近的了，那就说明没有碰撞
         Vec3f AO = -B.p;
         Vec3f AB = A.p - B.p;
         searchDirection = -(AO % AB) % AB;
@@ -130,14 +134,17 @@ namespace P3D
         // triangle, check if closest to one of the edges, point, or face
         for (int iter = 0; iter < GJK_MAX_ITER; iter++)
         {
-            Vec3f AO = -C.p;
+            // 三角形阶段：
+            // 查找原点在哪个 Voronoi 区域
+            // 即 AO 在 nAB 的同侧, AO 在 nAC 的同侧, 或者都不在
+            Vec3f AO = -C.p; // from C to origin
             Vec3f AB = B.p - C.p;
             Vec3f AC = A.p - C.p;
             Vec3f normal = AB % AC;
             Vec3f nAB = AB % normal;
             Vec3f nAC = normal % AC;
 
-            if (AO * nAB > 0)
+            if (AO * nAB > 0) // AO 在 nAB 的同侧
             {
                 // edge of AB is closest, searchDirection perpendicular to AB towards O
                 A = B;
@@ -151,7 +158,7 @@ namespace P3D
                 }
             } else
             {
-                if (AO * nAC > 0)
+                if (AO * nAC > 0) // AO 在 nAC 的同侧
                 {
                     // edge of AC is closest, searchDirection perpendicular to AC towards O
                     B = C;
@@ -164,13 +171,18 @@ namespace P3D
                     }
                 } else
                 {
+                    // 四边形阶段
+
                     // hurray! best shape is tetrahedron
                     // just find which direction to look in
-                    if (normal * AO > 0)
+                    if (normal * AO > 0) // AO 和 normal 同侧
                     {
+                        // 在 normal 方向找点
                         searchDirection = normal;
-                    } else
+                    } else // AO 和 normal 异侧
                     {
+                        // 在 -normal 方向找点
+                        // 并且翻转三角形
                         searchDirection = -normal;
                         // invert triangle
                         MinkPoint tmp(A);
@@ -198,6 +210,8 @@ namespace P3D
                     Vec3f nACD = AC % AD;
                     Vec3f nADB = AD % AB;
 
+                    // 看原点在四面体的哪个 Voronoi 区域
+                    // 并且移除对应的点，继续迭代成三角形
                     if (nACD * AO > 0)
                     {
                         // remove B and continue with triangle
@@ -217,13 +231,13 @@ namespace P3D
                             if (nADB * AO > 0)
                             {
                                 // remove C and continue with triangle
-                                //s = Simplex(s.A, s.D, s.B, s.At, s.Dt, s.Bt);
+                                // s = Simplex(s.A, s.D, s.B, s.At, s.Dt, s.Bt);
                                 B = C;
                                 C = D;
                             } else
                             {
                                 // GOTCHA! TETRAHEDRON COVERS THE ORIGIN!
-
+                                // 原点在四面体内，碰撞成立，返回 Tetrahedron{D,C,B,A}
                                 incDebugTally(GJKCollidesIterationStatistics, iter + 2);
                                 return std::optional<Tetrahedron>(Tetrahedron{D, C, B, A});
                             }
