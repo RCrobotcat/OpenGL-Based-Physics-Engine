@@ -45,6 +45,7 @@ namespace P3D
 
     static double getDistanceOfTriangleToOriginSquared(Triangle t, Vec3f *vertices)
     {
+        // vertices[t[0]]: 三角形上的任一点，其表示的向量为原点指向这个点的向量
         return pointToPlaneDistanceSquared(getNormalVec(t, vertices), vertices[t[0]]);
     }
 

@@ -55,6 +55,8 @@ namespace P3D
 
     void fillNeighborBuf(const Triangle *triangles, int triangleCount, TriangleNeighbors *neighborBuf)
     {
+        // 每个三角形存 3 个邻居，分别对应本三角形三条边（BC/CA/AB）
+        // 如果某条边没有邻接面，通常会是 -1（后续逻辑会用到这个约定）
         for (int i = 0; i < triangleCount; i++)
         {
             for (int j = i + 1; j < triangleCount; j++)
