@@ -171,7 +171,7 @@ namespace P3D
                     }
                 } else
                 {
-                    // 四边形阶段
+                    // 四面体阶段
 
                     // hurray! best shape is tetrahedron
                     // just find which direction to look in
@@ -295,7 +295,6 @@ namespace P3D
             Vec3f closestTriangleNormal = getNormalVec(closestTriangle, builder.vertexBuf);
 
             MinkPoint point(getSupport(info, closestTriangleNormal));
-
 
             catchable_assert(isVecValid(point.p));
 
