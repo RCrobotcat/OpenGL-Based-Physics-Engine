@@ -275,12 +275,14 @@ namespace P3D
     {
         initializeBuffer(s, bufs);
 
+        // 给凸多面体的三角面建立邻接关系表（face adjacency），供后续 EPA/几何拓扑更新快速找“相邻面”
+        // ConvexShapeBuilder 构造函数把外部缓冲区指针和计数挂到对象上，然后立刻调用 fillNeighborBuf(...) 预计算每个三角形的邻居
         ConvexShapeBuilder builder(bufs.vertBuf, bufs.triangleBuf, 4, 4, bufs.neighborBuf, bufs.removalBuf,
                                    bufs.edgeBuf);
 
         for (int iter = 0; iter < EPA_MAX_ITER; iter++)
         {
-            NearestSurface ns = getNearestSurface(builder);
+            NearestSurface ns = getNearestSurface(builder); // 遍历当前四面体所有的三角面，获取最靠近原点的三角面
             int closestTriangleIndex = ns.triangleIndex;
             double distSq = ns.distanceSquared;
             Triangle closestTriangle = builder.triangleBuf[closestTriangleIndex];
@@ -304,14 +306,15 @@ namespace P3D
             MinkowskiPointIndices curIndices{point.originFirst, point.originSecond};
 
             // Do not remove! The inversion catches NaN as well!
-            if (!(newPointDistSq <= distSq * 1.01))
+            if (!(newPointDistSq <= distSq * 1.01)) // 四面体还能明显外扩
             {
                 bufs.knownVecs[builder.vertexCount] = curIndices;
                 builder.addPoint(point.p, closestTriangleIndex);
-            } else
+            } else // 四面体已经足够包住原点了，EPA 结束，计算交点和穿透向量
             {
                 // closestTriangle is an edge triangle, so our best direction is towards this triangle.
 
+                // 射线起点是原点，方向是最近面法向
                 RayIntersection<float> ri = rayTriangleIntersection(Vec3f(), closestTriangleNormal, a, b, c);
 
                 exitVector = ri.d * closestTriangleNormal;
@@ -323,6 +326,7 @@ namespace P3D
                     bufs.knownVecs[closestTriangle[2]]
                 };
 
+                // 计算重心坐标 u v w
                 Vec3f v0 = b - a, v1 = c - a, v2 = exitVector - a;
 
                 float d00 = v0 * v0;
@@ -338,6 +342,7 @@ namespace P3D
                 Vec3f A0 = inds[0][0], A1 = inds[1][0], A2 = inds[2][0];
                 Vec3f B0 = inds[0][1], B1 = inds[1][1], B2 = inds[2][1];
 
+                // 重心坐标插值
                 Vec3f avgFirst = A0 * u + A1 * v + A2 * w;
                 Vec3f avgSecond = B0 * u + B1 * v + B2 * w;
 
