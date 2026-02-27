@@ -302,6 +302,7 @@ namespace P3D
             catchable_assert(isVecValid(point.p));
 
             // point is the new point to be added, check if it's past the current triangle
+            // newPointDistSq 计算的是“新 support 点 point.p 到过原点、法向为 closestTriangleNormal 的平面”的距离平方
             double newPointDistSq = pow(point.p * closestTriangleNormal, 2) / lengthSquared(closestTriangleNormal);
 
             MinkowskiPointIndices curIndices{point.originFirst, point.originSecond};
@@ -328,8 +329,8 @@ namespace P3D
                 };
 
                 // 计算重心坐标 u v w
+                // 采用克拉默法则 避免了叉乘运算 更为高效
                 Vec3f v0 = b - a, v1 = c - a, v2 = exitVector - a;
-
                 float d00 = v0 * v0;
                 float d01 = v0 * v1;
                 float d11 = v1 * v1;
