@@ -64,6 +64,10 @@ void mouse_callback(GLFWwindow *window, double xpos, double ypos);
 
 void scroll_callback(GLFWwindow *window, double xoffset, double yoffset);
 
+void updatePlayerController(GLFWwindow *window, World<CustomPart> &world, UpgradeableMutex &worldMutex);
+
+bool isPlayerGrounded(World<CustomPart> &world, UpgradeableMutex &worldMutex);
+
 void framebuffer_size_callback(GLFWwindow *window, int width, int height);
 
 void processInput(GLFWwindow *window);
@@ -78,6 +82,7 @@ const unsigned int SCR_HEIGHT = 1080;
 // physics world
 World<CustomPart> *g_world = nullptr;
 UpgradeableMutex *g_worldMutex = nullptr;
+CustomPart *g_playerPart = nullptr;
 
 // Camera
 Camera camera(glm::vec3(-22, 5.0f, 35.0f));
@@ -97,6 +102,14 @@ float g_fireCooldown = 0.0f;
 float g_fireRate = 10.0f; // bullets per second
 float g_fireRange = 100.0f; // ray length
 float g_fireImpulse = 100.0f; // push strength
+
+// FPS controller params
+float g_playerHeight = 5.0f;
+float g_playerRadius = 1.0f;
+float g_playerMoveSpeed = 14.0f;
+float g_playerJumpSpeed = 5.0f;
+float g_playerEyeHeight = 0.75f;
+bool g_jumpPressedLast = false;
 
 int main()
 {
@@ -244,7 +257,7 @@ int main()
     g_worldMutex = &worldMutex;
 
     PartProperties basicProperties;
-    basicProperties.density = 3.0;
+    basicProperties.density = 10.0;
     basicProperties.friction = 0.8;
     basicProperties.bouncyness = 0.1;
 
@@ -317,7 +330,7 @@ int main()
         {-3.0, 12.0, 2.0, 1}, // Gold
         {-1.0, 14.0, 2.0, 2}, // Grass
         {1.0, 16.0, 2.0, 3}, // Plastic
-        {3.0, 18.0, 2.0, 4} // Wall
+        {3.0, 18.0, 2.0, 1} // Gold
     };
 
     struct BoxInit
@@ -330,7 +343,7 @@ int main()
         {-2.0, 8.0, 5.0, 1}, // Gold
         {0.0, 10.0, 5.0, 2}, // Grass
         {2.0, 12.0, 5.0, 3}, // Plastic
-        {4.0, 14.0, 5.0, 4} // Wall
+        {4.0, 14.0, 5.0, 1} // Gold
     };
 
     std::vector<std::unique_ptr<CustomPart>> parts;
@@ -362,6 +375,22 @@ int main()
         world.addPart(part.get());
         parts.push_back(std::move(part));
     }
+
+    // Player capsule
+    PartProperties playerProperties;
+    playerProperties.density = 20.0f;
+    playerProperties.friction = 0.5f;
+    playerProperties.bouncyness = 0.01f;
+    auto playerPart = std::make_unique<CustomPart>(
+        cylinderShape(g_playerRadius, g_playerHeight), // radius, height
+        GlobalCFrame(camera.Position.x, camera.Position.y, camera.Position.z),
+        playerProperties,
+        CustomPart::MODEL,
+        4
+    );
+    world.addPart(playerPart.get());
+    g_playerPart = playerPart.get();
+    parts.push_back(std::move(playerPart));
 
     // Gun Model (Dynamics)
     // Approximated as a box for physics
@@ -684,6 +713,14 @@ int main()
 
         processInput(window);
 
+        updatePlayerController(window, world, worldMutex);
+        if (g_playerPart)
+        {
+            std::shared_lock<UpgradeableMutex> lock(worldMutex);
+            Vec3 p = castPositionToVec3(g_playerPart->getPosition());
+            camera.Position = glm::vec3((float) p.x, (float) (p.y + g_playerEyeHeight * g_playerHeight), (float) p.z);
+        }
+
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -769,9 +806,9 @@ int main()
                     renderPlane(floorSize, floorUVScale);
                 } else if (part.type == CustomPart::WALL)
                 {
-                    pbrShader.setMat4("model", m);
-                    pbrShader.setMat3("normalMatrix", glm::transpose(glm::inverse(glm::mat3(m))));
-                    renderCube();
+                    // pbrShader.setMat4("model", m);
+                    // pbrShader.setMat3("normalMatrix", glm::transpose(glm::inverse(glm::mat3(m))));
+                    // renderCube();
                 } else if (part.type == CustomPart::CUBE)
                 {
                     pbrShader.setMat4("model", m);
@@ -827,15 +864,15 @@ void processInput(GLFWwindow *window)
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
 
-    float cameraSpeed = 5.0f * deltaTime; // adjust accordingly
-    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) // w: forward
-        camera.ProcessKeyboard(FORWARD, deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) // s: backward
-        camera.ProcessKeyboard(BACKWARD, deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) // a: left
-        camera.ProcessKeyboard(LEFT, deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) // d: right
-        camera.ProcessKeyboard(RIGHT, deltaTime);
+    // float cameraSpeed = 5.0f * deltaTime; // adjust accordingly
+    // if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) // w: forward
+    //     camera.ProcessKeyboard(FORWARD, deltaTime);
+    // if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) // s: backward
+    //     camera.ProcessKeyboard(BACKWARD, deltaTime);
+    // if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) // a: left
+    //     camera.ProcessKeyboard(LEFT, deltaTime);
+    // if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) // d: right
+    //     camera.ProcessKeyboard(RIGHT, deltaTime);
 
     // Shooting => LMB
     bool fireNow = (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS);
@@ -880,6 +917,71 @@ void scroll_callback(GLFWwindow *window, double xoffset, double yoffset)
 void framebuffer_size_callback(GLFWwindow *window, int width, int height)
 {
     glViewport(0, 0, width, height);
+}
+
+bool isPlayerGrounded(World<CustomPart> &world, UpgradeableMutex &worldMutex)
+{
+    if (!g_playerPart) return false;
+
+    Vec3 center = castPositionToVec3(g_playerPart->getPosition());
+    const double capsuleHalfHeight = g_playerHeight * 0.5f;
+    const double probeDistance = capsuleHalfHeight * 0.5f + 0.1f;
+
+    Position origin(center.x, center.y, center.z);
+    Ray downRay;
+    downRay.origin = origin;
+    downRay.direction = Vec3(0.0, -1.0, 0.0);
+
+    RaycastResult<CustomPart> hit;
+    bool ok = performRaycast(downRay, world, worldMutex, hit, probeDistance);
+    if (!ok || hit.hitPart == nullptr) return false;
+
+    // filter out self hits
+    if (hit.hitPart == g_playerPart) return false;
+
+    return true;
+}
+
+void updatePlayerController(GLFWwindow *window, World<CustomPart> &world, UpgradeableMutex &worldMutex)
+{
+    if (!g_playerPart) return;
+
+    glm::vec3 forward = glm::normalize(glm::vec3(camera.Front.x, 0.0f, camera.Front.z));
+    glm::vec3 right = glm::normalize(glm::cross(forward, glm::vec3(0, 1, 0)));
+
+    glm::vec3 wish(0.0f);
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) wish += forward;
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) wish -= forward;
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) wish += right;
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) wish -= right;
+
+    if (glm::length(wish) > 1e-5f) wish = glm::normalize(wish);
+
+    Vec3 curVelocity; {
+        std::shared_lock<UpgradeableMutex> lock(worldMutex);
+        curVelocity = g_playerPart->getVelocity();
+    }
+
+    Vec3 targetVel(
+        (double) (wish.x * g_playerMoveSpeed),
+        curVelocity.y,
+        (double) (wish.z * g_playerMoveSpeed)
+    );
+
+    // jump
+    bool jumpNow = glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS;
+    bool jumpTriggered = jumpNow && !g_jumpPressedLast;
+    g_jumpPressedLast = jumpNow;
+    if (jumpTriggered && isPlayerGrounded(world, worldMutex))
+    {
+        targetVel.y = g_playerJumpSpeed;
+    }
+
+    // sync velocity to physics world
+    {
+        std::unique_lock<UpgradeableMutex> lock(worldMutex);
+        g_playerPart->setVelocity(targetVel);
+    }
 }
 
 void shootRay(World<CustomPart> &world, UpgradeableMutex &worldMutex)

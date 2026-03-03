@@ -6,6 +6,7 @@
 #define IF_PHYSICS_DRAWOBJECTS_H
 #include "glm/vec3.hpp"
 #include "Shader.h"
+#include "Model.h"
 
 #endif //IF_PHYSICS_DRAWOBJECTS_H
 

@@ -17,10 +17,10 @@ namespace P3D {
 #endif
 
 inline bool isValid(double d) {
-	return std::isfinite(d) && std::abs(d) < 100000.0;
+	return std::isfinite(d) && std::abs(d) < 10000000.0;
 }
 inline bool isValid(float f) {
-	return std::isfinite(f) && std::abs(f) < 100000.0; // sanity check
+	return std::isfinite(f) && std::abs(f) < 10000000.0; // sanity check
 }
 
 template<typename T, size_t Size>
