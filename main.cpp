@@ -26,8 +26,11 @@
 #include <Physics3D/worldIteration.h>
 #include <Physics3D/geometry/shapeCreation.h>
 #include <Physics3D/geometry/shapeLibrary.h>
+#include <Physics3D/CollisionCast/collisionCast.h>
 #include <Physics3D/threading/physicsThread.h>
 #include <Physics3D/externalforces/directionalGravity.h>
+
+#include "Physics3D/math/ray.h"
 
 using namespace P3D;
 
@@ -59,6 +62,11 @@ public:
         : Part(shape, position, properties), type(type), materialIndex(materialIndex)
     {
     }
+
+    void applyImpulseAtPoint(Vec3 hitPoint, Vec3 impulse)
+    {
+        // TODO
+    }
 };
 
 void mouse_callback(GLFWwindow *window, double xpos, double ypos);
@@ -71,8 +79,14 @@ void processInput(GLFWwindow *window);
 
 unsigned int loadTexture(const char *path);
 
+void shootRay(World<CustomPart> &world, UpgradeableMutex &worldMutex);
+
 const unsigned int SCR_WIDTH = 1920;
 const unsigned int SCR_HEIGHT = 1080;
+
+// physics world
+World<CustomPart> *g_world = nullptr;
+UpgradeableMutex *g_worldMutex = nullptr;
 
 // Camera
 Camera camera(glm::vec3(-22, 5.0f, 35.0f));
@@ -85,6 +99,13 @@ float lastFrame = 0.0f; // 上一帧的时间
 
 float floorSize = 100.0f;
 float floorUVScale = 25.0f; // Tiling factor for floor texture
+
+// Shooting
+bool g_firePressedLast = false;
+float g_fireCooldown = 0.0f;
+float g_fireRate = 10.0f; // bullets per second
+float g_fireRange = 100.0f; // ray length
+float g_fireImpulse = 40.0f; // push strength
 
 int main()
 {
@@ -228,6 +249,8 @@ int main()
     // -------------------
     World<CustomPart> world(1.0 / 60.0);
     UpgradeableMutex worldMutex;
+    g_world = &world;
+    g_worldMutex = &worldMutex;
 
     PartProperties basicProperties;
     basicProperties.density = 5.0;
@@ -558,6 +581,35 @@ int main()
         ImGui::NewFrame();
         // ImGui::ShowDemoWindow(); // Show demo window! :)
 
+        // Crosshair
+        {
+            ImDrawList *draw = ImGui::GetForegroundDrawList();
+
+            ImVec2 center(ImGui::GetIO().DisplaySize.x * 0.5f,
+                          ImGui::GetIO().DisplaySize.y * 0.5f);
+
+            float halfLen = 6.0f; // 每条线的一半长度（像素）
+            float gap = 3.0f; // 中间空隙（像素）
+            float thick = 2.0f; // 线宽
+
+            ImU32 col = IM_COL32(255, 255, 255, 220); // 白色半透明
+
+            // 横线（左右两段）
+            draw->AddLine(ImVec2(center.x - gap - halfLen, center.y),
+                          ImVec2(center.x - gap, center.y), col, thick);
+            draw->AddLine(ImVec2(center.x + gap, center.y),
+                          ImVec2(center.x + gap + halfLen, center.y), col, thick);
+
+            // 竖线（上下两段）
+            draw->AddLine(ImVec2(center.x, center.y - gap - halfLen),
+                          ImVec2(center.x, center.y - gap), col, thick);
+            draw->AddLine(ImVec2(center.x, center.y + gap),
+                          ImVec2(center.x, center.y + gap + halfLen), col, thick);
+
+            // 中心点
+            draw->AddCircleFilled(center, 1.5f, col);
+        }
+
         // ImGui window: Stats
         {
             ImGui::Begin("Stats");
@@ -590,6 +642,7 @@ int main()
 
         float currentFrame = static_cast<float>(glfwGetTime());
         deltaTime = currentFrame - lastFrame;
+        g_fireCooldown = std::max(0.0f, g_fireCooldown - deltaTime);
         lastFrame = currentFrame;
 
         processInput(window);
@@ -740,6 +793,19 @@ void processInput(GLFWwindow *window)
         camera.ProcessKeyboard(LEFT, deltaTime);
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) // d: right
         camera.ProcessKeyboard(RIGHT, deltaTime);
+
+    // Shooting => LMB
+    bool fireNow = (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS);
+
+    // single shot on press
+    bool fireTriggered = fireNow && !g_firePressedLast;
+    g_firePressedLast = fireNow;
+
+    if (fireTriggered && g_fireCooldown <= 0.0f)
+    {
+        shootRay(*g_world, *g_worldMutex);
+        g_fireCooldown = 1.0f / g_fireRate;
+    }
 }
 
 void mouse_callback(GLFWwindow *window, double xposIn, double yposIn)
@@ -771,6 +837,52 @@ void scroll_callback(GLFWwindow *window, double xoffset, double yoffset)
 void framebuffer_size_callback(GLFWwindow *window, int width, int height)
 {
     glViewport(0, 0, width, height);
+}
+
+void shootRay(World<CustomPart> &world, UpgradeableMutex &worldMutex)
+{
+    // Ray in world space from camera center
+    glm::vec3 origin = camera.Position;
+    glm::vec3 dir = glm::normalize(camera.Front);
+
+    // Convert to Physics3D vectors
+    Vec3 rayOrigin(origin.x, origin.y, origin.z);
+    Vec3 rayDir(dir.x, dir.y, dir.z);
+
+    // Raycast in Physics World (read lock)
+    std::shared_lock<UpgradeableMutex> lock(worldMutex);
+    RaycastResult<CustomPart> hit;
+    Position rayOriginPos(rayOrigin.x, rayOrigin.y, rayOrigin.z);
+    Ray ray(rayOriginPos, rayDir);
+    bool ok = performRaycast(ray, world, worldMutex, hit, static_cast<double>(g_fireRange));
+
+    if (!ok)
+        return;
+
+    // Apply impulse to the hit part (write lock required)
+    lock.unlock();
+    std::unique_lock<UpgradeableMutex> wlock(worldMutex);
+
+    CustomPart *bestPart = hit.hitPart;
+    double bestT = hit.distance;
+    Vec3 hitPos = rayOrigin + rayDir * bestT;
+    Vec3 impulse = rayDir * g_fireImpulse;
+    try
+    {
+        if (bestPart->type != CustomPart::PLANE)
+            bestPart->applyImpulseAtPoint(impulse, hitPos);
+    } catch (...)
+    {
+        // ignore
+    }
+
+    if (bestPart->type != CustomPart::PLANE)
+        std::cout << "[Shoot] hit part type=" << (int) bestPart->type
+                << " t=" << bestT
+                << " pos=(" << (float) hitPos.x << "," << (float) hitPos.y << "," << (float) hitPos.z << ")\n";
+    else
+        std::cout << "[Shoot] hit floor t=" << bestT
+                << " pos=(" << (float) hitPos.x << "," << (float) hitPos.y << "," << (float) hitPos.z << ")\n";
 }
 
 // utility function for loading a 2D texture from file
