@@ -49,7 +49,7 @@ glm::mat4 toGlm(const Matrix<T, 4, 4> &mat)
 class CustomPart : public Part
 {
 public:
-    enum Type { SPHERE, CUBE, PLANE, MODEL };
+    enum Type { SPHERE, CUBE, PLANE, WALL, MODEL };
 
     Type type;
 
@@ -63,9 +63,10 @@ public:
     {
     }
 
-    void applyImpulseAtPoint(Vec3 hitPoint, Vec3 impulse)
+    void applyImpulse(Vec3 relativeOrigin, Vec3 impulse)
     {
-        // TODO
+        constexpr double dt = 1.0 / 100.0; // 与 world 步长一致
+        applyForce(relativeOrigin, impulse / dt);
     }
 };
 
@@ -105,7 +106,7 @@ bool g_firePressedLast = false;
 float g_fireCooldown = 0.0f;
 float g_fireRate = 10.0f; // bullets per second
 float g_fireRange = 100.0f; // ray length
-float g_fireImpulse = 40.0f; // push strength
+float g_fireImpulse = 100.0f; // push strength
 
 int main()
 {
@@ -247,15 +248,61 @@ int main()
 
     // Physics World Setup
     // -------------------
-    World<CustomPart> world(1.0 / 60.0);
+    World<CustomPart> world(1.0 / 100.0);
     UpgradeableMutex worldMutex;
     g_world = &world;
     g_worldMutex = &worldMutex;
 
     PartProperties basicProperties;
-    basicProperties.density = 5.0;
+    basicProperties.density = 3.0;
     basicProperties.friction = 0.8;
-    basicProperties.bouncyness = 0.01;
+    basicProperties.bouncyness = 0.1;
+
+    // Arena walls
+    const double wallHeight = 50.0;
+    const double wallThickness = 1.0;
+
+    const double floorTopY = -10.0;
+    const double wallCenterY = floorTopY + wallHeight * 0.5;
+
+    const double halfExtent = floorSize;
+    const double wallOffset = halfExtent + wallThickness * 0.5;
+
+    // Left wall (x-)
+    std::unique_ptr<CustomPart> wallLeft = std::make_unique<CustomPart>(
+        boxShape(wallThickness, wallHeight, floorSize * 2.0),
+        GlobalCFrame(-wallOffset, wallCenterY, 0.0),
+        basicProperties,
+        CustomPart::WALL,
+        4);
+    world.addTerrainPart(wallLeft.get());
+
+    // Right wall (x+)
+    std::unique_ptr<CustomPart> wallRight = std::make_unique<CustomPart>(
+        boxShape(wallThickness, wallHeight, floorSize * 2.0),
+        GlobalCFrame(wallOffset, wallCenterY, 0.0),
+        basicProperties,
+        CustomPart::WALL,
+        4);
+    world.addTerrainPart(wallRight.get());
+
+    // Back wall (z-)
+    std::unique_ptr<CustomPart> wallBack = std::make_unique<CustomPart>(
+        boxShape(floorSize * 2.0, wallHeight, wallThickness),
+        GlobalCFrame(0.0, wallCenterY, -wallOffset),
+        basicProperties,
+        CustomPart::WALL,
+        4);
+    world.addTerrainPart(wallBack.get());
+
+    // Front wall (z+)
+    std::unique_ptr<CustomPart> wallFront = std::make_unique<CustomPart>(
+        boxShape(floorSize * 2.0, wallHeight, wallThickness),
+        GlobalCFrame(0.0, wallCenterY, wallOffset),
+        basicProperties,
+        CustomPart::WALL,
+        4);
+    world.addTerrainPart(wallFront.get());
 
     // Floor
     std::unique_ptr<CustomPart> floor = std::make_unique<CustomPart>(
@@ -686,6 +733,7 @@ int main()
             {
                 // Determine textures
                 int matIdx = part.materialIndex;
+
                 if (matIdx >= 0 && matIdx < 5 && part.type != CustomPart::MODEL)
                 {
                     glActiveTexture(GL_TEXTURE3);
@@ -729,6 +777,11 @@ int main()
                     pbrShader.setMat4("model", mNoScale);
                     pbrShader.setMat3("normalMatrix", glm::transpose(glm::inverse(glm::mat3(mNoScale))));
                     renderPlane(floorSize, floorUVScale);
+                } else if (part.type == CustomPart::WALL)
+                {
+                    pbrShader.setMat4("model", m);
+                    pbrShader.setMat3("normalMatrix", glm::transpose(glm::inverse(glm::mat3(m))));
+                    renderCube();
                 } else if (part.type == CustomPart::CUBE)
                 {
                     pbrShader.setMat4("model", m);
@@ -869,8 +922,11 @@ void shootRay(World<CustomPart> &world, UpgradeableMutex &worldMutex)
     Vec3 impulse = rayDir * g_fireImpulse;
     try
     {
-        if (bestPart->type != CustomPart::PLANE)
-            bestPart->applyImpulseAtPoint(impulse, hitPos);
+        if (bestPart->type != CustomPart::PLANE && bestPart->type != CustomPart::WALL)
+        {
+            Vec3 partCenter = castPositionToVec3(bestPart->getCFrame().position);
+            bestPart->applyImpulse(hitPos - partCenter, impulse);
+        }
     } catch (...)
     {
         // ignore
@@ -879,9 +935,6 @@ void shootRay(World<CustomPart> &world, UpgradeableMutex &worldMutex)
     if (bestPart->type != CustomPart::PLANE)
         std::cout << "[Shoot] hit part type=" << (int) bestPart->type
                 << " t=" << bestT
-                << " pos=(" << (float) hitPos.x << "," << (float) hitPos.y << "," << (float) hitPos.z << ")\n";
-    else
-        std::cout << "[Shoot] hit floor t=" << bestT
                 << " pos=(" << (float) hitPos.x << "," << (float) hitPos.y << "," << (float) hitPos.z << ")\n";
 }
 
