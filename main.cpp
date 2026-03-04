@@ -93,6 +93,7 @@ bool firstMouse = true;
 float deltaTime = 0.0f; // 当前帧与上一帧的时间差
 float lastFrame = 0.0f; // 上一帧的时间
 
+// Floor
 float floorSize = 100.0f;
 float floorUVScale = 25.0f; // Tiling factor for floor texture
 
@@ -101,7 +102,7 @@ bool g_firePressedLast = false;
 float g_fireCooldown = 0.0f;
 float g_fireRate = 10.0f; // bullets per second
 float g_fireRange = 100.0f; // ray length
-float g_fireImpulse = 100.0f; // push strength
+float g_fireImpulse = 150.0f; // push strength
 
 // FPS controller params
 float g_playerHeight = 5.0f;
@@ -238,16 +239,16 @@ int main()
     unsigned int wallAOMap = loadTexture("../Textures/wall/ao.png");
 
     // model
-    // unsigned int modelAlbedoMap = loadTexture(
-    //     "../models/Cerberus_by_Andrew_Maximov/Textures/Cerberus_A.tga");
-    // unsigned int modelNormalMap = loadTexture(
-    //     "../models/Cerberus_by_Andrew_Maximov/Textures/Cerberus_N.tga");
-    // unsigned int modelMetallicMap = loadTexture(
-    //     "../models/Cerberus_by_Andrew_Maximov/Textures/Cerberus_M.tga");
-    // unsigned int modelRoughnessMap = loadTexture(
-    //     "../models/Cerberus_by_Andrew_Maximov/Textures/Cerberus_R.tga");
-    // unsigned int modelAOMap = loadTexture(
-    //     "../models/Cerberus_by_Andrew_Maximov/Textures/Raw/Cerberus_AO.tga");
+    unsigned int modelAlbedoMap = loadTexture(
+        "../models/Cerberus_by_Andrew_Maximov/Textures/Cerberus_A.tga");
+    unsigned int modelNormalMap = loadTexture(
+        "../models/Cerberus_by_Andrew_Maximov/Textures/Cerberus_N.tga");
+    unsigned int modelMetallicMap = loadTexture(
+        "../models/Cerberus_by_Andrew_Maximov/Textures/Cerberus_M.tga");
+    unsigned int modelRoughnessMap = loadTexture(
+        "../models/Cerberus_by_Andrew_Maximov/Textures/Cerberus_R.tga");
+    unsigned int modelAOMap = loadTexture(
+        "../models/Cerberus_by_Andrew_Maximov/Textures/Raw/Cerberus_AO.tga");
 
     // Physics World Setup
     // -------------------
@@ -257,8 +258,8 @@ int main()
     g_worldMutex = &worldMutex;
 
     PartProperties basicProperties;
-    basicProperties.density = 10.0;
-    basicProperties.friction = 0.8;
+    basicProperties.density = 15.0;
+    basicProperties.friction = 2.0;
     basicProperties.bouncyness = 0.1;
 
     // Arena walls
@@ -391,20 +392,6 @@ int main()
     world.addPart(playerPart.get());
     g_playerPart = playerPart.get();
     parts.push_back(std::move(playerPart));
-
-    // Gun Model (Dynamics)
-    // Approximated as a box for physics
-    // auto gunPart = std::make_unique<CustomPart>(
-    //     boxShape(0.1, 0.1, 0.3), // Approximate size
-    //     GlobalCFrame(0.0, 20.0, 10.0, Rotation::fromEulerAngles(0.2, 0.1, 0.3)),
-    //     basicProperties,
-    //     CustomPart::MODEL, // Mark as model
-    //     0 // Texture index doesn't matter for model as it has its own
-    // );
-    // // Make gun lighter so it bounces more funnily?
-    // gunPart->properties.density = 0.5;
-    // world.addPart(gunPart.get());
-    // parts.push_back(std::move(gunPart));
 
     // Gravity
     DirectionalGravity gravity(Vec3(0.0, -9.81, 0.0));
@@ -634,6 +621,9 @@ int main()
     backgroundShader.use();
     backgroundShader.setMat4("projection", projection);
 
+    glm::mat4 weaponProjection = glm::perspective(glm::radians(60.0f), (float) SCR_WIDTH / (float) SCR_HEIGHT,
+                                                  0.01f, 1000.0f);
+
     // then before rendering, configure the viewport to the original framebuffer's screen dimensions
     int scrWidth, scrHeight;
     glfwGetFramebufferSize(window, &scrWidth, &scrHeight);
@@ -822,15 +812,6 @@ int main()
             });
         }
 
-        // Gun textures
-        // glm::mat4 m = glm::mat4(1.0f);
-        // m = glm::translate(m, glm::vec3(0.0f, 0.0f, 10.0f));
-        // m = glm::scale(m, glm::vec3(0.3f));
-        // m = glm::rotate(m, glm::radians(-90.0f), glm::vec3(1, 0, 0));
-        // m = glm::rotate(m, glm::radians(90.0f), glm::vec3(0, 0, 1));
-        // renderModel(pbrShader, gunModel, m, modelAlbedoMap, modelNormalMap, modelMetallicMap, modelRoughnessMap,
-        //             modelAOMap);
-
         // render skybox (render as last to prevent overdraw)
         backgroundShader.use();
 
@@ -840,6 +821,24 @@ int main()
         //glBindTexture(GL_TEXTURE_CUBE_MAP, irradianceMap); // display irradiance map
         //glBindTexture(GL_TEXTURE_CUBE_MAP, prefilterMap); // display prefilter map
         renderCube();
+
+        // ---------- Weapon Pass (Camera Stack style overlay) ----------
+        pbrShader.use();
+        pbrShader.setMat4("projection", weaponProjection);
+        pbrShader.setMat4("view", view);
+        pbrShader.setVec3("camPos", camera.Position);
+
+        glm::mat4 weaponModel = glm::inverse(view);
+        weaponModel = glm::translate(weaponModel, glm::vec3(0.08f, -0.07f, -0.29f));
+        weaponModel = glm::scale(weaponModel, glm::vec3(0.0013f));
+        weaponModel = glm::rotate(weaponModel, glm::radians(-90.0f), glm::vec3(1, 0, 0));
+        weaponModel = glm::rotate(weaponModel, glm::radians(6.5f), glm::vec3(0, 0, 1));
+        weaponModel = glm::rotate(weaponModel, glm::radians(10.0f), glm::vec3(1, 0, 1));
+
+        // render gun model
+        renderModel(pbrShader, gunModel, weaponModel, modelAlbedoMap, modelNormalMap, modelMetallicMap,
+                    modelRoughnessMap,
+                    modelAOMap);
 
         // render BRDF map to screen
         //brdfShader.Use();
