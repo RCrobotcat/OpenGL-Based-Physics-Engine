@@ -866,8 +866,8 @@ int main()
                     if (abs(glm::dot(direction, up)) > 0.99f) up = glm::vec3(1, 0, 0);
 
                     // Create a lookAt matrix to orient the bullet in the direction of velocity
-                    // 因为 glm::lookAt 产生的是“视图矩阵”（world -> view），
-                    // 而这里需要的是“模型朝向矩阵”（local -> world），两者方向相反，所以要取逆
+                    // 因为 glm::lookAt 产生的是“视图矩阵”（world -> view or local），
+                    // 而这里需要的是“模型朝向矩阵”（view or local -> world），两者方向相反，所以要取逆
                     glm::mat4 look = glm::lookAt(glm::vec3(0), direction, up);
                     model = model * glm::inverse(look);
 
