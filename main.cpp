@@ -35,6 +35,15 @@
 
 using namespace P3D;
 
+struct Bullet
+{
+    glm::vec3 position;
+    glm::vec3 velocity;
+    float life;
+};
+
+std::vector<Bullet> g_bullets;
+
 // Custom Part to hold rendering info
 class CustomPart : public Part
 {
@@ -71,8 +80,6 @@ bool isPlayerGrounded(World<CustomPart> &world, UpgradeableMutex &worldMutex);
 void framebuffer_size_callback(GLFWwindow *window, int width, int height);
 
 void processInput(GLFWwindow *window);
-
-unsigned int loadTexture(const char *path);
 
 void shootRay(World<CustomPart> &world, UpgradeableMutex &worldMutex);
 
@@ -249,6 +256,13 @@ int main()
         "../models/Cerberus_by_Andrew_Maximov/Textures/Cerberus_R.tga");
     unsigned int modelAOMap = loadTexture(
         "../models/Cerberus_by_Andrew_Maximov/Textures/Raw/Cerberus_AO.tga");
+
+    // Colors for bullets
+    unsigned int yellowAlbedo = createSolidTexture(255, 255, 0);
+    unsigned int defaultNormal = createSolidTexture(128, 128, 255);
+    unsigned int defaultMetallic = createSolidTexture(0, 0, 0);
+    unsigned int defaultRoughness = createSolidTexture(255, 255, 255);
+    unsigned int defaultAO = createSolidTexture(255, 255, 255);
 
     // Physics World Setup
     // -------------------
@@ -812,9 +826,61 @@ int main()
             });
         }
 
+        // Update and Render Bullets
+        pbrShader.use();
+        for (auto it = g_bullets.begin(); it != g_bullets.end();)
+        {
+            it->life -= deltaTime;
+            if (it->life <= 0)
+            {
+                it = g_bullets.erase(it);
+            } else
+            {
+                it->position += it->velocity * deltaTime;
+                ++it;
+            }
+        }
+
+        if (!g_bullets.empty())
+        {
+            glActiveTexture(GL_TEXTURE3);
+            glBindTexture(GL_TEXTURE_2D, yellowAlbedo);
+            glActiveTexture(GL_TEXTURE4);
+            glBindTexture(GL_TEXTURE_2D, defaultNormal);
+            glActiveTexture(GL_TEXTURE5);
+            glBindTexture(GL_TEXTURE_2D, defaultMetallic);
+            glActiveTexture(GL_TEXTURE6);
+            glBindTexture(GL_TEXTURE_2D, defaultRoughness);
+            glActiveTexture(GL_TEXTURE7);
+            glBindTexture(GL_TEXTURE_2D, defaultAO);
+
+            for (const auto &b: g_bullets)
+            {
+                glm::mat4 model = glm::mat4(1.0f);
+                model = glm::translate(model, b.position);
+
+                if (glm::length(b.velocity) > 0.001f)
+                {
+                    glm::vec3 direction = glm::normalize(b.velocity);
+                    glm::vec3 up = glm::vec3(0, 1, 0);
+                    if (abs(glm::dot(direction, up)) > 0.99f) up = glm::vec3(1, 0, 0);
+
+                    // Create a lookAt matrix to orient the bullet in the direction of velocity
+                    glm::mat4 look = glm::lookAt(glm::vec3(0), direction, up);
+                    model = model * glm::inverse(look);
+
+                    // Scale along Z to make it long
+                    model = glm::scale(model, glm::vec3(0.04f, 0.04f, 0.8f));
+                }
+
+                pbrShader.setMat4("model", model);
+                pbrShader.setMat3("normalMatrix", glm::transpose(glm::inverse(glm::mat3(model))));
+                renderCube();
+            }
+        }
+
         // render skybox (render as last to prevent overdraw)
         backgroundShader.use();
-
         backgroundShader.setMat4("view", view);
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
@@ -822,13 +888,13 @@ int main()
         //glBindTexture(GL_TEXTURE_CUBE_MAP, prefilterMap); // display prefilter map
         renderCube();
 
-        // ---------- Weapon Pass (Camera Stack style overlay) ----------
+        // ---------- Weapon Pass ----------
         pbrShader.use();
         pbrShader.setMat4("projection", weaponProjection);
         pbrShader.setMat4("view", view);
         pbrShader.setVec3("camPos", camera.Position);
 
-        glm::mat4 weaponModel = glm::inverse(view);
+        glm::mat4 weaponModel = glm::inverse(view); // let gun model always in the camera view space
         weaponModel = glm::translate(weaponModel, glm::vec3(0.08f, -0.07f, -0.29f));
         weaponModel = glm::scale(weaponModel, glm::vec3(0.0013f));
         weaponModel = glm::rotate(weaponModel, glm::radians(-90.0f), glm::vec3(1, 0, 0));
@@ -999,6 +1065,24 @@ void shootRay(World<CustomPart> &world, UpgradeableMutex &worldMutex)
     Position rayOriginPos(rayOrigin.x, rayOrigin.y, rayOrigin.z);
     Ray ray(rayOriginPos, rayDir);
     bool ok = performRaycast(ray, world, worldMutex, hit, static_cast<double>(g_fireRange));
+
+    // bullet visual effect
+    Vec3 hitPosV3 = rayOrigin + rayDir * (ok ? hit.distance : g_fireRange);
+    glm::vec3 hitPoint(hitPosV3.x, hitPosV3.y, hitPosV3.z);
+
+    glm::mat4 view = camera.GetViewMatrix();
+    glm::mat4 invView = glm::inverse(view);
+    glm::vec4 muzzleLocal(0.12f, -0.2f, -0.40f, 1.0f);
+    glm::vec4 muzzleWorld = invView * muzzleLocal;
+    glm::vec3 startPos = glm::vec3(muzzleWorld);
+
+    glm::vec3 bulletDir = glm::normalize(hitPoint - startPos);
+
+    Bullet b;
+    b.position = startPos;
+    b.velocity = bulletDir * 200.0f; // Fast speed
+    b.life = 2.0f;
+    g_bullets.push_back(b);
 
     if (!ok)
         return;
