@@ -16,423 +16,489 @@
 
 #define COLLISSION_DEPTH_FORCE_MULTIPLIER 2000
 
-namespace P3D {
-/*
-	exitVector is the distance p2 must travel so that the shapes are no longer colliding
-*/
+namespace P3D
+{
+    /*
+        exitVector is the distance p2 must travel so that the shapes are no longer colliding
+    */
 
-void handleCollision(Part& part1, Part& part2, Position collisionPoint, Vec3 exitVector) {
-	Debug::logPoint(collisionPoint, Debug::INTERSECTION);
-	
-	MotorizedPhysical& phys1 = *part1.getPhysical()->mainPhysical;
-	MotorizedPhysical& phys2 = *part2.getPhysical()->mainPhysical;
+    void handleCollision(Part &part1, Part &part2, Position collisionPoint, Vec3 exitVector)
+    {
+        Debug::logPoint(collisionPoint, Debug::INTERSECTION);
 
-	double sizeOrder = std::min(part1.maxRadius, part2.maxRadius);
-	if(lengthSquared(exitVector) <= 1E-8 * sizeOrder * sizeOrder) {
-		return; // don't do anything for very small colissions
-	}
+        MotorizedPhysical &phys1 = *part1.getPhysical()->mainPhysical;
+        MotorizedPhysical &phys2 = *part2.getPhysical()->mainPhysical;
 
-	Vec3 collissionRelP1 = collisionPoint - phys1.getCenterOfMass();
-	Vec3 collissionRelP2 = collisionPoint - phys2.getCenterOfMass();
+        double sizeOrder = std::min(part1.maxRadius, part2.maxRadius);
+        if (lengthSquared(exitVector) <= 1E-8 * sizeOrder * sizeOrder)
+        {
+            return; // don't do anything for very small colissions
+        }
 
-	double inertia1A = phys1.getInertiaOfPointInDirectionRelative(collissionRelP1, exitVector);
-	double inertia2A = phys2.getInertiaOfPointInDirectionRelative(collissionRelP2, exitVector);
-	double combinedInertia = 1 / (1 / inertia1A + 1 / inertia2A);
+        Vec3 collissionRelP1 = collisionPoint - phys1.getCenterOfMass();
+        Vec3 collissionRelP2 = collisionPoint - phys2.getCenterOfMass();
 
-	// Friction
-	double staticFriction = part1.properties.friction * part2.properties.friction;
-	double dynamicFriction = part1.properties.friction * part2.properties.friction;
+        double inertia1A = phys1.getInertiaOfPointInDirectionRelative(collissionRelP1, exitVector);
+        double inertia2A = phys2.getInertiaOfPointInDirectionRelative(collissionRelP2, exitVector);
+        double combinedInertia = 1 / (1 / inertia1A + 1 / inertia2A);
 
-
-	Vec3 depthForce = -exitVector * (COLLISSION_DEPTH_FORCE_MULTIPLIER * combinedInertia);
-
-	phys1.applyForce(collissionRelP1, depthForce);
-	phys2.applyForce(collissionRelP2, -depthForce);
-
-	Vec3 part1ToColission = collisionPoint - part1.getPosition();
-	Vec3 part2ToColission = collisionPoint - part2.getPosition();
-
-	Vec3 relativeVelocity = (part1.getMotion().getVelocityOfPoint(part1ToColission) - part1.properties.conveyorEffect) - (part2.getMotion().getVelocityOfPoint(part2ToColission) - part2.properties.conveyorEffect);
-
-	bool isImpulseColission = relativeVelocity * exitVector > 0;
-
-	Vec3 impulse;
-
-	double combinedBouncyness = part1.properties.bouncyness * part2.properties.bouncyness;
-
-	if(isImpulseColission) { // moving towards the other object
-		Vec3 desiredAccel = -exitVector * (relativeVelocity * exitVector) / lengthSquared(exitVector) * (1.0 + combinedBouncyness);
-		Vec3 zeroRelVelImpulse = desiredAccel * combinedInertia;
-		impulse = zeroRelVelImpulse;
-		phys1.applyImpulse(collissionRelP1, impulse);
-		phys2.applyImpulse(collissionRelP2, -impulse);
-		relativeVelocity += desiredAccel;
-	}
-
-	Vec3 slidingVelocity = exitVector % relativeVelocity % exitVector / lengthSquared(exitVector);
-
-	// Compute combined inertia in the horizontal direction
-	double inertia1B = phys1.getInertiaOfPointInDirectionRelative(collissionRelP1, slidingVelocity);
-	double inertia2B = phys2.getInertiaOfPointInDirectionRelative(collissionRelP2, slidingVelocity);
-	double combinedHorizontalInertia = 1 / (1 / inertia1B + 1 / inertia2B);
-
-	if(isImpulseColission) {
-		Vec3 maxFrictionImpulse = -exitVector % impulse % exitVector / lengthSquared(exitVector) * staticFriction;
-		Vec3 stopFricImpulse = -slidingVelocity * combinedHorizontalInertia;
-
-		Vec3 fricImpulse = (lengthSquared(stopFricImpulse) < lengthSquared(maxFrictionImpulse)) ? stopFricImpulse : maxFrictionImpulse;
-
-		phys1.applyImpulse(collissionRelP1, fricImpulse);
-		phys2.applyImpulse(collissionRelP2, -fricImpulse);
-	}
-
-	double normalForce = length(depthForce);
-	double frictionForce = normalForce * dynamicFriction;
-	double slidingSpeed = length(slidingVelocity) + 1E-100;
-	Vec3 dynamicFricForce;
-	double dynamicSaturationSpeed = sizeOrder * 0.01;
-	if(slidingSpeed > dynamicSaturationSpeed) {
-		dynamicFricForce = -slidingVelocity / slidingSpeed * frictionForce;
-	} else {
-		double effectFactor = slidingSpeed / (dynamicSaturationSpeed);
-		dynamicFricForce = -slidingVelocity / slidingSpeed * frictionForce * effectFactor;
-	}
-	phys1.applyForce(collissionRelP1, dynamicFricForce);
-	phys2.applyForce(collissionRelP2, -dynamicFricForce);
-
-	assert(phys1.isValid());
-	assert(phys2.isValid());
-}
-
-/*
-	exitVector is the distance p2 must travel so that the shapes are no longer colliding
-*/
-void handleTerrainCollision(Part& part1, Part& part2, Position collisionPoint, Vec3 exitVector) {
-	Debug::logPoint(collisionPoint, Debug::INTERSECTION);
-	MotorizedPhysical& phys1 = *part1.getPhysical()->mainPhysical;
-
-	double sizeOrder = std::min(part1.maxRadius, part2.maxRadius);
-	if(lengthSquared(exitVector) <= 1E-8 * sizeOrder * sizeOrder) {
-		return; // don't do anything for very small colissions
-	}
-
-	Vec3 collissionRelP1 = collisionPoint - phys1.getCenterOfMass();
-
-	double inertia = phys1.getInertiaOfPointInDirectionRelative(collissionRelP1, exitVector);
-
-	// Friction
-	double staticFriction = part1.properties.friction * part2.properties.friction;
-	double dynamicFriction = part1.properties.friction * part2.properties.friction;
+        // Friction
+        double staticFriction = part1.properties.friction * part2.properties.friction;
+        double dynamicFriction = part1.properties.friction * part2.properties.friction;
 
 
-	Vec3 depthForce = -exitVector * (COLLISSION_DEPTH_FORCE_MULTIPLIER * inertia);
+        Vec3 depthForce = -exitVector * (COLLISSION_DEPTH_FORCE_MULTIPLIER * combinedInertia);
 
-	phys1.applyForce(collissionRelP1, depthForce);
+        phys1.applyForce(collissionRelP1, depthForce);
+        phys2.applyForce(collissionRelP2, -depthForce);
 
-	//Vec3 rigidBodyToPart = part1.getCFrame().getPosition() - part1.getPhysical()->rigidBody.getCenterOfMass();
-	Vec3 partToColission = collisionPoint - part1.getPosition();
-	Vec3 relativeVelocity = part1.getMotion().getVelocityOfPoint(partToColission) - part1.properties.conveyorEffect + part2.getCFrame().localToRelative(part2.properties.conveyorEffect);
+        Vec3 part1ToColission = collisionPoint - part1.getPosition();
+        Vec3 part2ToColission = collisionPoint - part2.getPosition();
 
-	bool isImpulseColission = relativeVelocity * exitVector > 0;
+        Vec3 relativeVelocity = (part1.getMotion().getVelocityOfPoint(part1ToColission) - part1.properties.
+                                 conveyorEffect) - (
+                                    part2.getMotion().getVelocityOfPoint(part2ToColission) - part2.properties.
+                                    conveyorEffect);
 
-	Vec3 impulse;
+        bool isImpulseColission = relativeVelocity * exitVector > 0;
 
-	double combinedBouncyness = part1.properties.bouncyness * part2.properties.bouncyness;
+        Vec3 impulse;
 
-	if(isImpulseColission) { // moving towards the other object
-		Vec3 desiredAccel = -exitVector * (relativeVelocity * exitVector) / lengthSquared(exitVector) * (1.0 + combinedBouncyness);
-		Vec3 zeroRelVelImpulse = desiredAccel * inertia;
-		impulse = zeroRelVelImpulse;
-		phys1.applyImpulse(collissionRelP1, impulse);
-		relativeVelocity += desiredAccel;
-	}
+        double combinedBouncyness = part1.properties.bouncyness * part2.properties.bouncyness;
 
-	Vec3 slidingVelocity = exitVector % relativeVelocity % exitVector / lengthSquared(exitVector);
+        if (isImpulseColission)
+        {
+            // moving towards the other object
+            Vec3 desiredAccel = -exitVector * (relativeVelocity * exitVector) / lengthSquared(exitVector) * (
+                                    1.0 + combinedBouncyness);
+            Vec3 zeroRelVelImpulse = desiredAccel * combinedInertia;
+            impulse = zeroRelVelImpulse;
+            phys1.applyImpulse(collissionRelP1, impulse);
+            phys2.applyImpulse(collissionRelP2, -impulse);
+            relativeVelocity += desiredAccel;
+        }
 
-	// Compute combined inertia in the horizontal direction
-	double combinedHorizontalInertia = phys1.getInertiaOfPointInDirectionRelative(collissionRelP1, slidingVelocity);
+        Vec3 slidingVelocity = exitVector % relativeVelocity % exitVector / lengthSquared(exitVector);
 
-	if(isImpulseColission) {
-		Vec3 maxFrictionImpulse = -exitVector % impulse % exitVector / lengthSquared(exitVector) * staticFriction;
-		Vec3 stopFricImpulse = -slidingVelocity * combinedHorizontalInertia;
+        // Compute combined inertia in the horizontal direction
+        double inertia1B = phys1.getInertiaOfPointInDirectionRelative(collissionRelP1, slidingVelocity);
+        double inertia2B = phys2.getInertiaOfPointInDirectionRelative(collissionRelP2, slidingVelocity);
+        double combinedHorizontalInertia = 1 / (1 / inertia1B + 1 / inertia2B);
 
-		Vec3 fricImpulse = (lengthSquared(stopFricImpulse) < lengthSquared(maxFrictionImpulse)) ? stopFricImpulse : maxFrictionImpulse;
+        if (isImpulseColission)
+        {
+            Vec3 maxFrictionImpulse = -exitVector % impulse % exitVector / lengthSquared(exitVector) * staticFriction;
+            Vec3 stopFricImpulse = -slidingVelocity * combinedHorizontalInertia;
 
-		phys1.applyImpulse(collissionRelP1, fricImpulse);
-	}
+            Vec3 fricImpulse = (lengthSquared(stopFricImpulse) < lengthSquared(maxFrictionImpulse))
+                                   ? stopFricImpulse
+                                   : maxFrictionImpulse;
 
-	double normalForce = length(depthForce);
-	double frictionForce = normalForce * dynamicFriction;
-	double slidingSpeed = length(slidingVelocity) + 1E-100;
-	Vec3 dynamicFricForce;
-	double dynamicSaturationSpeed = sizeOrder * 0.01;
-	if(slidingSpeed > dynamicSaturationSpeed) {
-		dynamicFricForce = -slidingVelocity / slidingSpeed * frictionForce;
-	} else {
-		double effectFactor = slidingSpeed / (dynamicSaturationSpeed);
-		dynamicFricForce = -slidingVelocity / slidingSpeed * frictionForce * effectFactor;
-	}
-	phys1.applyForce(collissionRelP1, dynamicFricForce);
+            phys1.applyImpulse(collissionRelP1, fricImpulse);
+            phys2.applyImpulse(collissionRelP2, -fricImpulse);
+        }
 
-	assert(phys1.isValid());
-}
+        double normalForce = length(depthForce);
+        double frictionForce = normalForce * dynamicFriction;
+        double slidingSpeed = length(slidingVelocity) + 1E-100;
+        Vec3 dynamicFricForce;
+        double dynamicSaturationSpeed = sizeOrder * 0.01;
+        if (slidingSpeed > dynamicSaturationSpeed)
+        {
+            dynamicFricForce = -slidingVelocity / slidingSpeed * frictionForce;
+        } else
+        {
+            double effectFactor = slidingSpeed / (dynamicSaturationSpeed);
+            dynamicFricForce = -slidingVelocity / slidingSpeed * frictionForce * effectFactor;
+        }
+        phys1.applyForce(collissionRelP1, dynamicFricForce);
+        phys2.applyForce(collissionRelP2, -dynamicFricForce);
 
-/*
-	===== World Tick =====
-*/
+        assert(phys1.isValid());
+        assert(phys2.isValid());
+    }
 
-void WorldPrototype::tick(ThreadPool& threadPool) {
-	tickWorldUnsynchronized(*this, threadPool);
-}
+    /*
+        exitVector is the distance p2 must travel so that the shapes are no longer colliding
+    */
+    void handleTerrainCollision(Part &part1, Part &part2, Position collisionPoint, Vec3 exitVector)
+    {
+        Debug::logPoint(collisionPoint, Debug::INTERSECTION);
+        MotorizedPhysical &phys1 = *part1.getPhysical()->mainPhysical;
 
-void WorldPrototype::tick() {
-	ThreadPool singleThreadPool(1);
-	tickWorldUnsynchronized(*this, singleThreadPool);
-}
+        double sizeOrder = std::min(part1.maxRadius, part2.maxRadius);
+        if (lengthSquared(exitVector) <= 1E-8 * sizeOrder * sizeOrder)
+        {
+            return; // don't do anything for very small colissions
+        }
 
-void tickWorldUnsynchronized(WorldPrototype& world, ThreadPool& threadPool) {
-	physicsMeasure.mark(PhysicsProcess::COLISSION_OTHER);
-	findColissionsParallel(world, world.curColissions, threadPool);
+        Vec3 collissionRelP1 = collisionPoint - phys1.getCenterOfMass();
 
-	physicsMeasure.mark(PhysicsProcess::EXTERNALS);
-	applyExternalForces(world);
+        double inertia = phys1.getInertiaOfPointInDirectionRelative(collissionRelP1, exitVector);
 
-	physicsMeasure.mark(PhysicsProcess::COLISSION_HANDLING);
-	handleColissions(world.curColissions);
+        // Friction
+        double staticFriction = part1.properties.friction * part2.properties.friction;
+        double dynamicFriction = part1.properties.friction * part2.properties.friction;
 
-	physicsMeasure.mark(PhysicsProcess::OTHER);
-	intersectionStatistics.nextTally();
 
-	physicsMeasure.mark(PhysicsProcess::CONSTRAINTS);
-	handleConstraints(world);
+        Vec3 depthForce = -exitVector * (COLLISSION_DEPTH_FORCE_MULTIPLIER * inertia);
 
-	physicsMeasure.mark(PhysicsProcess::UPDATING);
-	update(world);
-}
+        phys1.applyForce(collissionRelP1, depthForce);
 
-void tickWorldSynchronized(WorldPrototype& world, ThreadPool& threadPool, UpgradeableMutex& worldMutex) {
-	physicsMeasure.mark(PhysicsProcess::WAIT_FOR_LOCK);
-	worldMutex.lock_upgradeable();
+        //Vec3 rigidBodyToPart = part1.getCFrame().getPosition() - part1.getPhysical()->rigidBody.getCenterOfMass();
+        Vec3 partToColission = collisionPoint - part1.getPosition();
+        Vec3 relativeVelocity = part1.getMotion().getVelocityOfPoint(partToColission) - part1.properties.conveyorEffect
+                                + part2.getCFrame().localToRelative(part2.properties.conveyorEffect);
 
-	physicsMeasure.mark(PhysicsProcess::COLISSION_OTHER);
-	findColissionsParallel(world, world.curColissions, threadPool);
+        bool isImpulseColission = relativeVelocity * exitVector > 0;
 
-	physicsMeasure.mark(PhysicsProcess::EXTERNALS);
-	applyExternalForces(world);
+        Vec3 impulse;
 
-	physicsMeasure.mark(PhysicsProcess::COLISSION_HANDLING);
-	handleColissions(world.curColissions);
+        double combinedBouncyness = part1.properties.bouncyness * part2.properties.bouncyness;
 
-	physicsMeasure.mark(PhysicsProcess::OTHER);
-	intersectionStatistics.nextTally();
+        if (isImpulseColission)
+        {
+            // moving towards the other object
+            Vec3 desiredAccel = -exitVector * (relativeVelocity * exitVector) / lengthSquared(exitVector) * (
+                                    1.0 + combinedBouncyness);
+            Vec3 zeroRelVelImpulse = desiredAccel * inertia;
+            impulse = zeroRelVelImpulse;
+            phys1.applyImpulse(collissionRelP1, impulse);
+            relativeVelocity += desiredAccel;
+        }
 
-	physicsMeasure.mark(PhysicsProcess::CONSTRAINTS);
-	handleConstraints(world);
+        Vec3 slidingVelocity = exitVector % relativeVelocity % exitVector / lengthSquared(exitVector);
 
-	physicsMeasure.mark(PhysicsProcess::WAIT_FOR_LOCK);
-	worldMutex.upgrade();
+        // Compute combined inertia in the horizontal direction
+        double combinedHorizontalInertia = phys1.getInertiaOfPointInDirectionRelative(collissionRelP1, slidingVelocity);
 
-	physicsMeasure.mark(PhysicsProcess::UPDATING);
-	update(world);
+        if (isImpulseColission)
+        {
+            Vec3 maxFrictionImpulse = -exitVector % impulse % exitVector / lengthSquared(exitVector) * staticFriction;
+            Vec3 stopFricImpulse = -slidingVelocity * combinedHorizontalInertia;
 
-	physicsMeasure.mark(PhysicsProcess::WAIT_FOR_LOCK);
-	worldMutex.unlock();
-}
+            Vec3 fricImpulse = (lengthSquared(stopFricImpulse) < lengthSquared(maxFrictionImpulse))
+                                   ? stopFricImpulse
+                                   : maxFrictionImpulse;
 
-void applyExternalForces(WorldPrototype& world) {
-	for(ExternalForce* force : world.externalForces) {
-		force->apply(&world);
-	}
-}
+            phys1.applyImpulse(collissionRelP1, fricImpulse);
+        }
 
-PartIntersection safeIntersects(const Part& p1, const Part& p2) {
+        double normalForce = length(depthForce);
+        double frictionForce = normalForce * dynamicFriction;
+        double slidingSpeed = length(slidingVelocity) + 1E-100;
+        Vec3 dynamicFricForce;
+        double dynamicSaturationSpeed = sizeOrder * 0.01;
+        if (slidingSpeed > dynamicSaturationSpeed)
+        {
+            dynamicFricForce = -slidingVelocity / slidingSpeed * frictionForce;
+        } else
+        {
+            double effectFactor = slidingSpeed / (dynamicSaturationSpeed);
+            dynamicFricForce = -slidingVelocity / slidingSpeed * frictionForce * effectFactor;
+        }
+        phys1.applyForce(collissionRelP1, dynamicFricForce);
+
+        assert(phys1.isValid());
+    }
+
+    /*
+        ===== World Tick =====
+    */
+
+    void WorldPrototype::tick(ThreadPool &threadPool)
+    {
+        tickWorldUnsynchronized(*this, threadPool);
+    }
+
+    void WorldPrototype::tick()
+    {
+        ThreadPool singleThreadPool(1);
+        tickWorldUnsynchronized(*this, singleThreadPool);
+    }
+
+    void tickWorldUnsynchronized(WorldPrototype &world, ThreadPool &threadPool)
+    {
+        physicsMeasure.mark(PhysicsProcess::COLISSION_OTHER);
+        findColissionsParallel(world, world.curColissions, threadPool);
+
+        physicsMeasure.mark(PhysicsProcess::EXTERNALS);
+        applyExternalForces(world);
+
+        physicsMeasure.mark(PhysicsProcess::COLISSION_HANDLING);
+        handleColissions(world.curColissions);
+
+        physicsMeasure.mark(PhysicsProcess::OTHER);
+        intersectionStatistics.nextTally();
+
+        physicsMeasure.mark(PhysicsProcess::CONSTRAINTS);
+        handleConstraints(world);
+
+        physicsMeasure.mark(PhysicsProcess::UPDATING);
+        update(world);
+    }
+
+    void tickWorldSynchronized(WorldPrototype &world, ThreadPool &threadPool, UpgradeableMutex &worldMutex)
+    {
+        physicsMeasure.mark(PhysicsProcess::WAIT_FOR_LOCK);
+        worldMutex.lock_upgradeable();
+
+        physicsMeasure.mark(PhysicsProcess::COLISSION_OTHER);
+        findColissionsParallel(world, world.curColissions, threadPool);
+
+        physicsMeasure.mark(PhysicsProcess::EXTERNALS);
+        applyExternalForces(world);
+
+        physicsMeasure.mark(PhysicsProcess::COLISSION_HANDLING);
+        handleColissions(world.curColissions);
+
+        physicsMeasure.mark(PhysicsProcess::OTHER);
+        intersectionStatistics.nextTally();
+
+        physicsMeasure.mark(PhysicsProcess::CONSTRAINTS);
+        handleConstraints(world);
+
+        physicsMeasure.mark(PhysicsProcess::WAIT_FOR_LOCK);
+        worldMutex.upgrade();
+
+        physicsMeasure.mark(PhysicsProcess::UPDATING);
+        update(world);
+
+        physicsMeasure.mark(PhysicsProcess::WAIT_FOR_LOCK);
+        worldMutex.unlock();
+    }
+
+    void applyExternalForces(WorldPrototype &world)
+    {
+        for (ExternalForce *force: world.externalForces)
+        {
+            force->apply(&world);
+        }
+    }
+
+    PartIntersection safeIntersects(const Part &p1, const Part &p2)
+    {
 #ifdef CATCH_INTERSECTION_ERRORS
-	try {
-		return p1.intersects(p2);
-	} catch(const std::exception& err) {
-		Debug::logError("Error occurred during intersection: %s", err.what());
+        try
+        {
+            return p1.intersects(p2);
+        } catch (const std::exception &err)
+        {
+            Debug::logError("Error occurred during intersection: %s", err.what());
 
-		Debug::saveIntersectionError(p1, p2, "colError");
+            Debug::saveIntersectionError(p1, p2, "colError");
 
-		throw err;
-	} catch(...) {
-		Debug::logError("Unknown error occured during intersection");
+            throw err;
+        } catch (...)
+        {
+            Debug::logError("Unknown error occured during intersection");
 
-		Debug::saveIntersectionError(p1, p2, "colError");
+            Debug::saveIntersectionError(p1, p2, "colError");
 
-		throw "exit";
-	}
+            throw "exit";
+        }
 #else
-	return p1.intersects(p2);
+        return p1.intersects(p2);
 #endif
-}
+    }
 
-void refineColissions(std::vector<Colission>& colissions) {
-	for (size_t i = 0; i < colissions.size();) {
+    void refineColissions(std::vector<Colission> &colissions)
+    {
+        for (size_t i = 0; i < colissions.size();)
+        {
+            Colission &col = colissions[i];
 
-		Colission& col = colissions[i];
+            PartIntersection result = safeIntersects(*col.p1, *col.p2);
 
-		PartIntersection result = safeIntersects(*col.p1, *col.p2);
+            if (result.intersects)
+            {
+                intersectionStatistics.addToTally(IntersectionResult::COLISSION, 1);
 
-		if (result.intersects) {
+                // add extra information
+                col.intersection = result.intersection;
+                col.exitVector = result.exitVector;
 
-			intersectionStatistics.addToTally(IntersectionResult::COLISSION, 1);
+                i++;
+            } else
+            {
+                intersectionStatistics.addToTally(IntersectionResult::GJK_REJECT, 1);
 
-			// add extra information
-			col.intersection = result.intersection;
-			col.exitVector = result.exitVector;
+                col = std::move(colissions.back());
+                colissions.pop_back();
+            }
+        }
+    }
 
-			i++;
-		}
-		else {
+    void parallelRefineColissions(ThreadPool &threadPool, std::vector<Colission> &colissions)
+    {
+        std::vector<Colission> wantedColission;
+        const size_t workEnd = colissions.size();
+        size_t currIndex = 0;
+        std::mutex colissionMutex, statsMutex, indexMutex, vecMutex;
 
-			intersectionStatistics.addToTally(IntersectionResult::GJK_REJECT, 1);
+        threadPool.doInParallel([&]
+        {
+            while (true)
+            {
+                indexMutex.lock();
+                size_t claimedWork = currIndex;
+                currIndex++;
+                indexMutex.unlock();
 
-			col = std::move(colissions.back());
-			colissions.pop_back();
+                if (claimedWork >= workEnd)
+                {
+                    break;
+                }
 
-		}
-	}
-}
+                Colission col = colissions[claimedWork];
+                PartIntersection result = safeIntersects(*col.p1, *col.p2);
 
-void parallelRefineColissions(ThreadPool& threadPool, std::vector<Colission>& colissions) {
-	std::vector<Colission> wantedColission;
-	const size_t workEnd = colissions.size();
-	size_t currIndex = 0;
-	std::mutex colissionMutex, statsMutex, indexMutex, vecMutex;
-
-	threadPool.doInParallel([&] {
-		while(true) {
-
-			indexMutex.lock();
-			size_t claimedWork = currIndex;
-			currIndex++;
-			indexMutex.unlock();
-
-			if(claimedWork >= workEnd) {
-				break;
-			}
-
-			Colission col = colissions[claimedWork];
-			PartIntersection result = safeIntersects(*col.p1, *col.p2);
-
-			if(result.intersects) {
-
-				statsMutex.lock();
-				intersectionStatistics.addToTally(IntersectionResult::COLISSION, 1);
-				statsMutex.unlock();
-
-
-				// add extra information
-				col.intersection = result.intersection;
-				col.exitVector = result.exitVector;
+                if (result.intersects)
+                {
+                    statsMutex.lock();
+                    intersectionStatistics.addToTally(IntersectionResult::COLISSION, 1);
+                    statsMutex.unlock();
 
 
-				vecMutex.lock();
-				wantedColission.push_back(col);
-				vecMutex.unlock();
-			} else {
-
-				statsMutex.lock();
-				intersectionStatistics.addToTally(IntersectionResult::GJK_REJECT, 1);
-				statsMutex.unlock();
+                    // add extra information
+                    col.intersection = result.intersection;
+                    col.exitVector = result.exitVector;
 
 
-			}
-		}
-	});
-	colissions.swap(wantedColission);
-}
+                    vecMutex.lock();
+                    wantedColission.push_back(col);
+                    vecMutex.unlock();
+                } else
+                {
+                    statsMutex.lock();
+                    intersectionStatistics.addToTally(IntersectionResult::GJK_REJECT, 1);
+                    statsMutex.unlock();
+                }
+            }
+        });
+        colissions.swap(wantedColission);
+    }
 
-void findColissions(WorldPrototype& world, ColissionBuffer& curColissions) {
-	curColissions.clear();
+    void findColissions(WorldPrototype &world, ColissionBuffer &curColissions)
+    {
+        curColissions.clear();
 
-	for(const ColissionLayer& layer : world.layers) {
-		if(layer.collidesInternally) {
-			layer.getInternalColissions(curColissions);
-		}
-	}
+        for (const ColissionLayer &layer: world.layers)
+        {
+            if (layer.collidesInternally)
+            {
+                layer.getInternalColissions(curColissions);
+            }
+        }
 
-	for(std::pair<int, int> collidingLayers : world.colissionMask) {
-		getColissionsBetween(world.layers[collidingLayers.first], world.layers[collidingLayers.second], curColissions);
-	}
+        for (std::pair<int, int> collidingLayers: world.colissionMask)
+        {
+            getColissionsBetween(world.layers[collidingLayers.first], world.layers[collidingLayers.second],
+                                 curColissions);
+        }
 
-	refineColissions(curColissions.freePartColissions);
-	refineColissions(curColissions.freeTerrainColissions);
-}
+        refineColissions(curColissions.freePartColissions);
+        refineColissions(curColissions.freeTerrainColissions);
+    }
 
-void findColissionsParallel(WorldPrototype& world, ColissionBuffer& curColissions, ThreadPool& threadPool) {
-	curColissions.clear();
+    void findColissionsParallel(WorldPrototype &world, ColissionBuffer &curColissions, ThreadPool &threadPool)
+    {
+        curColissions.clear();
 
-	for(const ColissionLayer& layer : world.layers) {
-		if(layer.collidesInternally) {
-			layer.getInternalColissions(curColissions);
-		}
-	}
+        for (const ColissionLayer &layer: world.layers)
+        {
+            if (layer.collidesInternally)
+            {
+                layer.getInternalColissions(curColissions);
+            }
+        }
 
-	for(std::pair<int, int> collidingLayers : world.colissionMask) {
-		getColissionsBetween(world.layers[collidingLayers.first], world.layers[collidingLayers.second], curColissions);
-	}
+        for (std::pair<int, int> collidingLayers: world.colissionMask)
+        {
+            getColissionsBetween(world.layers[collidingLayers.first], world.layers[collidingLayers.second],
+                                 curColissions);
+        }
 
-	parallelRefineColissions(threadPool, curColissions.freePartColissions);
-	parallelRefineColissions(threadPool, curColissions.freeTerrainColissions);
-}
+        parallelRefineColissions(threadPool, curColissions.freePartColissions);
+        parallelRefineColissions(threadPool, curColissions.freeTerrainColissions);
+    }
 
-void handleColissions(ColissionBuffer& curColissions) {
-	for(Colission c : curColissions.freePartColissions) {
-		handleCollision(*c.p1, *c.p2, c.intersection, c.exitVector);
-	}
-	for(Colission c : curColissions.freeTerrainColissions) {
-		handleTerrainCollision(*c.p1, *c.p2, c.intersection, c.exitVector);
-	}
-}
+    void handleColissions(ColissionBuffer &curColissions)
+    {
+        for (Colission c: curColissions.freePartColissions)
+        {
+            handleCollision(*c.p1, *c.p2, c.intersection, c.exitVector);
+        }
+        for (Colission c: curColissions.freeTerrainColissions)
+        {
+            handleTerrainCollision(*c.p1, *c.p2, c.intersection, c.exitVector);
+        }
+    }
 
-void handleConstraints(WorldPrototype& world) {
-	for(const ConstraintGroup& group : world.constraints) {
-		group.apply();
-	}
-}
-void update(WorldPrototype& world) {
-	for(MotorizedPhysical* physical : world.physicals) {
-		physical->update(world.deltaT);
-	}
+    void handleConstraints(WorldPrototype &world)
+    {
+        for (const ConstraintGroup &group: world.constraints)
+        {
+            group.apply();
+        }
+    }
 
-	for(ColissionLayer& layer : world.layers) {
-		layer.refresh();
-	}
-	world.age++;
+    void update(WorldPrototype &world)
+    {
+        for (MotorizedPhysical *physical: world.physicals)
+        {
+            physical->update(world.deltaT);
+        }
 
-	for(SoftLink* springLink : world.softLinks) {
-		springLink->update();
-	}
-}
+        for (ColissionLayer &layer: world.layers)
+        {
+            layer.refresh();
+        }
+        world.age++;
 
-double WorldPrototype::getTotalKineticEnergy() const {
-	double total = 0.0;
-	for(const MotorizedPhysical* p : this->physicals) {
-		total += p->getKineticEnergy();
-	}
-	return total;
-}
-double WorldPrototype::getTotalPotentialEnergy() const {
-	double total = 0.0;
-	for(ExternalForce* force : externalForces) {
-		total += force->getTotalPotentialEnergyForThisForce(this);
-	}
-	return total;
-}
-double WorldPrototype::getPotentialEnergyOfPhysical(const MotorizedPhysical& p) const {
-	double total = 0.0;
-	for(ExternalForce* force : externalForces) {
-		total += force->getPotentialEnergyForObject(this, p);
-	}
-	return total;
-}
-double WorldPrototype::getTotalEnergy() const {
-	return getTotalKineticEnergy() + getTotalPotentialEnergy();
-}
+        for (SoftLink *springLink: world.softLinks)
+        {
+            springLink->update();
+        }
+    }
 
-void WorldPrototype::addLink(SoftLink* link) {
-	softLinks.push_back(link);
-}
+    double WorldPrototype::getTotalKineticEnergy() const
+    {
+        double total = 0.0;
+        for (const MotorizedPhysical *p: this->physicals)
+        {
+            total += p->getKineticEnergy();
+        }
+        return total;
+    }
+
+    double WorldPrototype::getTotalPotentialEnergy() const
+    {
+        double total = 0.0;
+        for (ExternalForce *force: externalForces)
+        {
+            total += force->getTotalPotentialEnergyForThisForce(this);
+        }
+        return total;
+    }
+
+    double WorldPrototype::getPotentialEnergyOfPhysical(const MotorizedPhysical &p) const
+    {
+        double total = 0.0;
+        for (ExternalForce *force: externalForces)
+        {
+            total += force->getPotentialEnergyForObject(this, p);
+        }
+        return total;
+    }
+
+    double WorldPrototype::getTotalEnergy() const
+    {
+        return getTotalKineticEnergy() + getTotalPotentialEnergy();
+    }
+
+    void WorldPrototype::addLink(SoftLink *link)
+    {
+        softLinks.push_back(link);
+    }
 };
