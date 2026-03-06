@@ -21,7 +21,6 @@ namespace P3D
     /*
         exitVector is the distance p2 must travel so that the shapes are no longer colliding
     */
-
     void handleCollision(Part &part1, Part &part2, Position collisionPoint, Vec3 exitVector)
     {
         Debug::logPoint(collisionPoint, Debug::INTERSECTION);

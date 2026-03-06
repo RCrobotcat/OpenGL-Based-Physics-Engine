@@ -371,8 +371,13 @@ namespace P3D
                      const BoundsTemplate<float> &bounds)
     {
         assert(curTrunkSize >= 0 && curTrunkSize <= BRANCH_FACTOR);
+
+        // 如果当前 trunk 已经满了，就需要选择一个子节点进行插入
+        // 如果子节点也是 trunk 就继续递归，直到找到一个 leaf node 或者 group head node 可以插入
+        // 如果子节点是 leaf node 就创建一个新的 trunk 来包含这个 leaf node 和新的 node
         if (curTrunkSize == BRANCH_FACTOR)
         {
+            // 选择一个子节点进行插入，选择标准是插入后 bounds 增加最少的那个
             int chosenNode = TrunkSIMDHelperFallback::getLowestCombinationCost(curTrunk, bounds, curTrunkSize);
 
             TreeNodeRef &chosen = curTrunk.subNodes[chosenNode];
@@ -392,6 +397,7 @@ namespace P3D
 
                 chosen = TreeNodeRef(newTrunk, 2, false);
             }
+            // 把新的 node 插入到选中的子节点后，更新选中子节点的 bounds（合并原来的 bounds 和新的 node 的 bounds）
             curTrunk.setBoundsOfSubNode(chosenNode, unionOfBounds(oldSubNodeBounds, bounds));
             return BRANCH_FACTOR;
         } else

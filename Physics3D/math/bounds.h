@@ -106,6 +106,7 @@ namespace P3D
         return first.max >= second.min && first.min <= second.max;
     }
 
+    // returns the smallest bounds that contains both first and second
     template<typename T>
     constexpr BoundsTemplate<T> unionOfBounds(const BoundsTemplate<T> &first, const BoundsTemplate<T> &second) noexcept
     {

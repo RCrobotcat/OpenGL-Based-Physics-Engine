@@ -278,14 +278,23 @@ namespace P3D
 
     void ColissionLayer::getInternalColissions(ColissionBuffer &curColissions) const
     {
-        findColissionsInternal(curColissions.freePartColissions, subLayers[0].tree);
-        findColissionsBetween(curColissions.freeTerrainColissions, subLayers[0].tree, subLayers[1].tree);
+        // free parts with free parts
+        findColissionsInternal(curColissions.freePartColissions, subLayers[FREE_PARTS_LAYER].tree);
+
+        // free parts with terrain
+        findColissionsBetween(curColissions.freeTerrainColissions, subLayers[FREE_PARTS_LAYER].tree,
+                              subLayers[TERRAIN_PARTS_LAYER].tree);
     }
 
     void getColissionsBetween(const ColissionLayer &a, const ColissionLayer &b, ColissionBuffer &curColissions)
     {
+        // a.free with b.free
         findColissionsBetween(curColissions.freePartColissions, a.subLayers[0].tree, b.subLayers[0].tree);
+
+        // a.free with b.terrain
         findColissionsBetween(curColissions.freeTerrainColissions, a.subLayers[0].tree, b.subLayers[1].tree);
+
+        // b.free with a.terrain
         findColissionsBetween(curColissions.freeTerrainColissions, b.subLayers[0].tree, a.subLayers[1].tree);
     }
 };

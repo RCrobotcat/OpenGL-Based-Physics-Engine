@@ -35,12 +35,14 @@ namespace P3D
 
     class TreeNodeRef
     {
+        // friend 声明，允许 TreeTrunk 访问 TreeNodeRef 的私有成员
         friend struct TreeTrunk;
 
+        // pointer tagging（指针位编码）
         static constexpr std::uintptr_t SIZE_DATA_MASK = BRANCH_FACTOR - 1;
         static constexpr std::uintptr_t GROUP_HEAD_MASK = BRANCH_FACTOR;
-        static constexpr std::uintptr_t PTR_MASK = ~(SIZE_DATA_MASK | GROUP_HEAD_MASK);
-        static constexpr std::uintptr_t INVALID_REF = 0xADADADADADADADAD;
+        static constexpr std::uintptr_t PTR_MASK = ~(SIZE_DATA_MASK | GROUP_HEAD_MASK); // 用于提取指针部分的掩码，即除了pppppgsss以外的部分
+        static constexpr std::uintptr_t INVALID_REF = 0xADADADADADADADAD; // 无效引用
 
 
         /* encoding:
@@ -53,6 +55,11 @@ namespace P3D
                 g bit specifies 'isGroupHead'
                 s bits specify size of this trunk node - 1. 0b111 is a trunknode of size 8
         */
+        // 即：把 指针 + 元数据（node 类型 / size / group 标记） 全部压进一个 uintptr_t 里 => 0x...pppppgsss
+        // 最后三位sss:
+        // 000 表示 leaf node，ptr 指向对象
+        // 其他值表示 trunk node，ptr 指向 TreeTrunk，其值表示 trunk node 的大小 - 1
+        // 例如 001 表示 trunk node of size 1，0b111 表示 trunk node of size 8
         std::uintptr_t ptr;
 
         inline int getSizeData() const
@@ -215,8 +222,8 @@ namespace P3D
 
     struct alignas(64) TreeTrunk
     {
-        BoundsArray<BRANCH_FACTOR> subNodeBounds;
-        TreeNodeRef subNodes[BRANCH_FACTOR];
+        BoundsArray<BRANCH_FACTOR> subNodeBounds; // 存储子节点的 bounds，方便快速计算和比较 bounds，而不需要访问子节点
+        TreeNodeRef subNodes[BRANCH_FACTOR]; // 存储子节点的引用，可能是 leaf node（指向对象）或者 trunk node（指向另一个 TreeTrunk）
 
         inline BoundsTemplate<float> getBoundsOfSubNode(int subNode) const
         {
@@ -892,6 +899,8 @@ namespace P3D
 
     class BoundsTreePrototype
     {
+        // 基底 trunk 直接存储在 BoundsTree 上，避免了动态分配一个 trunk 来存储空树的情况
+        // 其余的 trunk 通过 allocator 分配
         TreeTrunk baseTrunk;
         int baseTrunkSize;
         TrunkAllocator allocator;

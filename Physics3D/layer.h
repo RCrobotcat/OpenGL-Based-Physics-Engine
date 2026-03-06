@@ -102,9 +102,10 @@ namespace P3D
         static constexpr int TERRAIN_PARTS_LAYER = 1;
         static constexpr int NUMBER_OF_SUBLAYERS = 2;
 
+        // freePartsLayer: 0
+        // terrainLayer: 1
         WorldLayer subLayers[NUMBER_OF_SUBLAYERS];
-        // freePartsLayer
-        // terrainLayer
+
         WorldPrototype *world;
         bool collidesInternally;
 
