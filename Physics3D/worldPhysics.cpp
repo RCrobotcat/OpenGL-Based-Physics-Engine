@@ -54,10 +54,11 @@ namespace P3D
         Vec3 part1ToColission = collisionPoint - part1.getPosition();
         Vec3 part2ToColission = collisionPoint - part2.getPosition();
 
-        Vec3 relativeVelocity = (part1.getMotion().getVelocityOfPoint(part1ToColission) - part1.properties.
-                                 conveyorEffect) - (
-                                    part2.getMotion().getVelocityOfPoint(part2ToColission) - part2.properties.
-                                    conveyorEffect);
+        // 减去 conveyorEffect，即不考虑传送带效应
+        Vec3 relativeVelocity = (part1.getMotion().getVelocityOfPoint(part1ToColission) -
+                                 part1.properties.conveyorEffect) -
+                                (part2.getMotion().getVelocityOfPoint(part2ToColission) -
+                                 part2.properties.conveyorEffect);
 
         bool isImpulseColission = relativeVelocity * exitVector > 0;
 
@@ -68,8 +69,8 @@ namespace P3D
         if (isImpulseColission)
         {
             // moving towards the other object
-            Vec3 desiredAccel = -exitVector * (relativeVelocity * exitVector) / lengthSquared(exitVector) * (
-                                    1.0 + combinedBouncyness);
+            Vec3 desiredAccel = -exitVector * (relativeVelocity * exitVector) / lengthSquared(exitVector) *
+                                (1.0 + combinedBouncyness);
             Vec3 zeroRelVelImpulse = desiredAccel * combinedInertia;
             impulse = zeroRelVelImpulse;
             phys1.applyImpulse(collissionRelP1, impulse);
