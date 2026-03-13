@@ -774,11 +774,11 @@ namespace P3D
 
     void MotorizedPhysical::update(double deltaT)
     {
-        Vec3 accel = forceResponse * totalForce * deltaT;
+        Vec3 accel = forceResponse * totalForce * deltaT; // deltaV 速度变化量
 
-        Vec3 localMoment = getCFrame().relativeToLocal(totalMoment);
+        Vec3 localMoment = getCFrame().relativeToLocal(totalMoment); // 总力矩
         Vec3 localRotAcc = momentResponse * localMoment * deltaT;
-        Vec3 rotAcc = getCFrame().localToRelative(localRotAcc);
+        Vec3 rotAcc = getCFrame().localToRelative(localRotAcc); // delta_omega 角速度变化量
 
         totalForce = Vec3();
         totalMoment = Vec3();
@@ -792,18 +792,18 @@ namespace P3D
         updateConstraints(deltaT);
         refreshPhysicalProperties();
 
-        Vec3 deltaCOM = this->totalCenterOfMass - oldCenterOfMass;
+        Vec3 deltaCOM = this->totalCenterOfMass - oldCenterOfMass; // 质心位置的变化，导致的位移误差需要在更新完约束后进行校正
         Vec3 movementOfCenterOfMass = motionOfCenterOfMass.getVelocity() * deltaT + accel * deltaT * deltaT * 0.5 -
                                       getCFrame().localToRelative(deltaCOM);
 
-        rotateAroundCenterOfMass(Rotation::fromRotationVector(motionOfCenterOfMass.getAngularVelocity() * deltaT));
-        translateUnsafeRecursive(movementOfCenterOfMass);
+        rotateAroundCenterOfMass(Rotation::fromRotationVector(motionOfCenterOfMass.getAngularVelocity() * deltaT)); // 把旋转应用到rigidbody上
+        translateUnsafeRecursive(movementOfCenterOfMass); // 把位移应用到rigidbody上
 
         Vec3 angularMomentumAfter = getTotalAngularMomentum();
 
         SymmetricMat3 globalMomentResponse = getCFrame().getRotation().localToGlobal(momentResponse);
 
-        Vec3 deltaAngularVelocity = globalMomentResponse * (angularMomentumAfter - angularMomentumBefore);
+        Vec3 deltaAngularVelocity = globalMomentResponse * (angularMomentumAfter - angularMomentumBefore); // 角动量守恒校正，用于减小约束/惯量变化引入的数值漂移
         this->motionOfCenterOfMass.rotation.rotation[0] -= deltaAngularVelocity;
 
         updateAttachedPhysicals();
