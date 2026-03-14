@@ -1,0 +1,148 @@
+cmake_minimum_required(VERSION 3.16)
+project(cpp_game_server)
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+add_library(cpp_game_server INTERFACE)
+
+# cpp_game_server 的头文件路径
+target_include_directories(cpp_game_server INTERFACE
+        ${CMAKE_CURRENT_SOURCE_DIR}/dependencies/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/NetCommon
+)
+
+target_compile_definitions(cpp_game_server INTERFACE ASIO_STANDALONE)
+
+if (WIN32)
+    target_link_libraries(cpp_game_server INTERFACE ws2_32 mswsock iphlpapi)
+endif()
+
+# 另一个可执行程序 simple_client
+add_executable(simple_client
+        NetClient/SimpleClients.cpp
+)
+
+target_include_directories(simple_client PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/dependencies/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/NetCommon
+)
+
+target_compile_definitions(simple_client PRIVATE ASIO_STANDALONE)
+
+if (WIN32)
+    target_link_libraries(simple_client PRIVATE ws2_32 mswsock iphlpapi)
+endif()
+
+# 另一个可执行程序 simple_server
+add_executable(simple_server
+        NetServer/SimpleServer.cpp
+)
+
+target_include_directories(simple_server PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/dependencies/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/NetCommon
+)
+
+target_compile_definitions(simple_server PRIVATE ASIO_STANDALONE)
+
+if (WIN32)
+    target_link_libraries(simple_server PRIVATE ws2_32 mswsock iphlpapi)
+endif()
+
+# 另一个可执行程序 CircleVsRect
+add_executable(CircleVsRect
+        Games/CircleVsRect.cpp
+        Games/olcPixelGameEngine.h
+        Games/olcPGEX_TransformedView.h
+        Games/MMO_common.h
+)
+
+target_include_directories(CircleVsRect PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/dependencies/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/NetCommon
+)
+
+target_link_libraries(CircleVsRect PRIVATE
+        ws2_32
+        mswsock
+        iphlpapi
+
+        opengl32
+        gdiplus
+        dwmapi
+        shlwapi
+)
+
+target_compile_definitions(CircleVsRect PRIVATE ASIO_STANDALONE)
+
+if (WIN32)
+    target_link_libraries(CircleVsRect PRIVATE ws2_32 mswsock iphlpapi)
+endif()
+
+# 另一个可执行程序 MMO_server
+add_executable(MMO_server
+        Games/MMO_server.cpp
+        Games/olcPixelGameEngine.h
+        Games/olcPGEX_TransformedView.h
+        Games/MMO_common.h
+)
+
+target_include_directories(MMO_server PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/dependencies/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/NetCommon
+)
+
+target_link_libraries(MMO_server PRIVATE
+        ws2_32
+        mswsock
+        iphlpapi
+
+        opengl32
+        gdiplus
+        dwmapi
+        shlwapi
+)
+
+target_compile_definitions(MMO_server PRIVATE ASIO_STANDALONE)
+
+if (WIN32)
+    target_link_libraries(MMO_server PRIVATE ws2_32 mswsock iphlpapi)
+endif()
+
+# 另一个可执行程序 Unity_server
+add_executable(Unity_server
+        UnityConnection/Unity_server.cpp
+        UnityConnection/Unity_common.h
+)
+
+target_include_directories(Unity_server PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/dependencies/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/NetCommon
+        ${CMAKE_CURRENT_SOURCE_DIR}/Games
+)
+
+target_link_libraries(Unity_server PRIVATE
+        ws2_32
+        mswsock
+        iphlpapi
+
+        opengl32
+        gdiplus
+        dwmapi
+        shlwapi
+)
+
+target_compile_definitions(Unity_server PRIVATE ASIO_STANDALONE)
+
+if (WIN32)
+    target_link_libraries(Unity_server PRIVATE ws2_32 mswsock iphlpapi)
+endif()
+
+if (MINGW)
+    target_link_options(Unity_server PRIVATE
+            -static
+            -static-libgcc
+            -static-libstdc++
+    )
+endif()

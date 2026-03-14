@@ -1,0 +1,49 @@
+#pragma once
+
+#define OLC_PGE_APPLICATION
+
+#include "olcPixelGameEngine.h"
+#include <cstdint>
+
+enum class UnityGameMsg : uint32_t {
+    Server_GetStatus,
+    Server_GetPing,
+
+    Client_Accepted,
+    Client_AssignID,
+    Client_RegisterWithServer,
+    Client_UnregisterWithServer,
+
+    Game_AddPlayer,
+    Game_RemovePlayer,
+    Game_UpdatePlayer,
+
+    Game_Ping,
+
+    // Link-up Game
+    Linkup_RequestInitSeed,
+    Linkup_AssignInitSeed,
+
+    Linkup_SyncInitBoardStatus,
+    Linkup_Eliminate,
+
+    Linkup_ForceExitGame,
+
+    Linkup_PlayerWin,
+    Linkup_PlayerLose,
+};
+
+struct sPlayerDescription {
+    uint32_t nUniqueID = 0;
+    uint32_t nAvatarID = 0;
+
+    uint32_t nHealth = 100;
+    uint32_t nAmmo = 20;
+    uint32_t nKills = 0;
+    uint32_t nDeaths = 0;
+
+    float fRadius = 0.5f;
+
+    olc::vf2d vPos;
+    olc::vf2d vVel;
+};
