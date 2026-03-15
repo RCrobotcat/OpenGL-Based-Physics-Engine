@@ -20,7 +20,7 @@ endif()
 
 # 另一个可执行程序 simple_client
 add_executable(simple_client
-        NetClient/SimpleClients.cpp
+        Examples/NetClient/SimpleClients.cpp
 )
 
 target_include_directories(simple_client PRIVATE
@@ -36,7 +36,7 @@ endif()
 
 # 另一个可执行程序 simple_server
 add_executable(simple_server
-        NetServer/SimpleServer.cpp
+        Examples/NetServer/SimpleServer.cpp
 )
 
 target_include_directories(simple_server PRIVATE
@@ -52,10 +52,10 @@ endif()
 
 # 另一个可执行程序 CircleVsRect
 add_executable(CircleVsRect
-        Games/CircleVsRect.cpp
-        Games/olcPixelGameEngine.h
-        Games/olcPGEX_TransformedView.h
-        Games/MMO_common.h
+        Examples/Games/CircleVsRect.cpp
+        Examples/Games/olcPixelGameEngine.h
+        Examples/Games/olcPGEX_TransformedView.h
+        Examples/Games/MMO_common.h
 )
 
 target_include_directories(CircleVsRect PRIVATE
@@ -82,10 +82,10 @@ endif()
 
 # 另一个可执行程序 MMO_server
 add_executable(MMO_server
-        Games/MMO_server.cpp
-        Games/olcPixelGameEngine.h
-        Games/olcPGEX_TransformedView.h
-        Games/MMO_common.h
+        Examples/Games/MMO_server.cpp
+        Examples/Games/olcPixelGameEngine.h
+        Examples/Games/olcPGEX_TransformedView.h
+        Examples/Games/MMO_common.h
 )
 
 target_include_directories(MMO_server PRIVATE
@@ -112,14 +112,14 @@ endif()
 
 # 另一个可执行程序 Unity_server
 add_executable(Unity_server
-        UnityConnection/Unity_server.cpp
-        UnityConnection/Unity_common.h
+        Examples/UnityConnection/Unity_server.cpp
+        Examples/UnityConnection/Unity_common.h
 )
 
 target_include_directories(Unity_server PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/dependencies/include
         ${CMAKE_CURRENT_SOURCE_DIR}/NetCommon
-        ${CMAKE_CURRENT_SOURCE_DIR}/Games
+        Examples/Games
 )
 
 target_link_libraries(Unity_server PRIVATE
