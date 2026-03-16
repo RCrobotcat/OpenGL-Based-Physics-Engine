@@ -22,7 +22,6 @@ namespace P3D
         PartT *hitPart = nullptr;
     };
 
-    // Template implementation must remain in header so callers can instantiate it.
     template<typename PartT>
     bool performRaycast(const Ray &ray,
                         World<PartT> &world,
@@ -41,6 +40,50 @@ namespace P3D
         Vec3 direction = ray.direction / std::sqrt(dirLenSq);
 
         std::shared_lock<UpgradeableMutex> lock(worldMutex);
+        world.forEachPart([&](PartT &part)
+        {
+            const GlobalCFrame &frame = part.getCFrame();
+            Vec3 localOrigin = frame.globalToLocal(ray.origin);
+            Vec3 localDirection = frame.relativeToLocal(direction);
+
+            double t = part.hitbox.getIntersectionDistance(localOrigin, localDirection);
+            if (!std::isfinite(t) || t < Ray::EPSILON || t > maxDistance || t >= result.distance)
+            {
+                return;
+            }
+
+            result.hit = true;
+            result.distance = t;
+            result.position = castPositionToVec3(ray.origin) + direction * t;
+            result.hitPart = &part;
+
+            Vec3 normalCandidate = result.position - castPositionToVec3(part.getPosition());
+            double normalLenSq = lengthSquared(normalCandidate);
+            result.normal = (normalLenSq > Ray::EPSILON * Ray::EPSILON)
+                                ? (normalCandidate / std::sqrt(normalLenSq))
+                                : (-direction);
+        });
+
+        return result.hit;
+    }
+
+    // Template implementation must remain in header so callers can instantiate it.
+    template<typename PartT>
+    bool performRaycast(const Ray &ray,
+                        World<PartT> &world,
+                        RaycastResult<PartT> &result,
+                        double maxDistance = std::numeric_limits<double>::infinity())
+    {
+        result = RaycastResult<PartT>{};
+
+        double dirLenSq = lengthSquared(ray.direction);
+        if (dirLenSq <= Ray::EPSILON * Ray::EPSILON)
+        {
+            return false;
+        }
+
+        Vec3 direction = ray.direction / std::sqrt(dirLenSq);
+
         world.forEachPart([&](PartT &part)
         {
             const GlobalCFrame &frame = part.getCFrame();

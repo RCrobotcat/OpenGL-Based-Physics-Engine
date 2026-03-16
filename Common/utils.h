@@ -3,17 +3,6 @@
 //
 #pragma once
 
-// Helper to convert Physics3D Mat4f to glm::mat4
-template<typename T>
-glm::mat4 toGlm(const P3D::Matrix<T, 4, 4> &mat)
-{
-    glm::mat4 result;
-    float data[16];
-    P3D::Matrix<float, 4, 4>(mat).toColMajorData(data);
-    memcpy(glm::value_ptr(result), data, 16 * sizeof(float));
-    return result;
-}
-
 // Helper to create 1x1 solid color texture
 unsigned int createSolidTexture(unsigned char r, unsigned char g, unsigned char b)
 {

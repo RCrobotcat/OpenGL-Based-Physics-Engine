@@ -35,6 +35,17 @@
 
 using namespace P3D;
 
+// Helper to convert Physics3D Mat4f to glm::mat4
+template<typename T>
+glm::mat4 toGlm(const P3D::Matrix<T, 4, 4> &mat)
+{
+    glm::mat4 result;
+    float data[16];
+    P3D::Matrix<float, 4, 4>(mat).toColMajorData(data);
+    memcpy(glm::value_ptr(result), data, 16 * sizeof(float));
+    return result;
+}
+
 struct Bullet
 {
     glm::vec3 position;
@@ -1109,7 +1120,7 @@ void shootRay(World<CustomPart> &world, UpgradeableMutex &worldMutex)
         // ignore
     }
 
-    if (bestPart->type != CustomPart::PLANE)
+    if (bestPart->type != CustomPart::PLANE && bestPart->type != CustomPart::WALL)
         std::cout << "[Shoot] hit part type=" << (int) bestPart->type
                 << " t=" << bestT
                 << " pos=(" << (float) hitPos.x << "," << (float) hitPos.y << "," << (float) hitPos.z << ")\n";
