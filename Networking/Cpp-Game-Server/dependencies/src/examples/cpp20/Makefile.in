@@ -313,7 +313,7 @@ operations_composed_8_OBJECTS = $(am_operations_composed_8_OBJECTS)
 operations_composed_8_LDADD = $(LDADD)
 @SEPARATE_COMPILATION_TRUE@operations_composed_8_DEPENDENCIES =  \
 @SEPARATE_COMPILATION_TRUE@	libasio.a
-am__type_erasure_type_erasure_SOURCES_DIST = type_erasure/main.cpp \
+am__type_erasure_type_erasure_SOURCES_DIST = type_erasure/demo_offline.cpp \
 	type_erasure/stdin_line_reader.cpp type_erasure/sleep.cpp
 @HAVE_COROUTINES_TRUE@am_type_erasure_type_erasure_OBJECTS =  \
 @HAVE_COROUTINES_TRUE@	type_erasure/main.$(OBJEXT) \
@@ -586,7 +586,7 @@ operations_composed_8_SOURCES = operations/composed_8.cpp
 @HAVE_COROUTINES_TRUE@coroutines_echo_server_with_as_tuple_default_SOURCES = coroutines/echo_server_with_as_tuple_default.cpp
 @HAVE_COROUTINES_TRUE@coroutines_refactored_echo_server_SOURCES = coroutines/refactored_echo_server.cpp
 @HAVE_COROUTINES_TRUE@coroutines_timeout_SOURCES = coroutines/timeout.cpp
-@HAVE_COROUTINES_TRUE@type_erasure_type_erasure_SOURCES = type_erasure/main.cpp type_erasure/stdin_line_reader.cpp type_erasure/sleep.cpp
+@HAVE_COROUTINES_TRUE@type_erasure_type_erasure_SOURCES = type_erasure/demo_offline.cpp type_erasure/stdin_line_reader.cpp type_erasure/sleep.cpp
 EXTRA_DIST = \
 	type_erasure/line_reader.hpp \
 	type_erasure/stdin_line_reader.hpp \

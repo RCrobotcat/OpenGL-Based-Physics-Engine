@@ -3,148 +3,201 @@
 #include "linalg/vec.h"
 #include "rotation.h"
 
-namespace P3D {
-template<typename T>
-struct CFrameTemplate {
-public:
-	Vector<T, 3> position;
-	RotationTemplate<T> rotation;
+namespace P3D
+{
+    template<typename T>
+    struct CFrameTemplate
+    {
+    public:
+        Vector<T, 3> position;
+        RotationTemplate<T> rotation;
 
-	CFrameTemplate(const Vector<T, 3>& position, const RotationTemplate<T>& rotation) : position(position), rotation(rotation) {}
-	explicit CFrameTemplate(const Vector<T, 3>& position) : position(position), rotation() {}
-	explicit CFrameTemplate(const T& x, const T& y, const T& z) : position(x, y, z), rotation() {}
-	explicit CFrameTemplate(const T& x, const T& y, const T& z, const RotationTemplate<T>& rotation) : position(x, y, z), rotation(rotation) {}
-	explicit CFrameTemplate(const RotationTemplate<T>& rotation) : position(0,0,0), rotation(rotation) {}
-	CFrameTemplate() : position(0, 0, 0), rotation() {}
+        CFrameTemplate(const Vector<T, 3> &position, const RotationTemplate<T> &rotation) : position(position),
+            rotation(rotation)
+        {
+        }
 
-	template<typename OtherT>
-	CFrameTemplate(const CFrameTemplate<OtherT>& other) : 
-		position(static_cast<Vector<T, 3>>(other.position)),
-		rotation(static_cast<RotationTemplate<T>>(other.rotation)) {}
+        explicit CFrameTemplate(const Vector<T, 3> &position) : position(position), rotation()
+        {
+        }
 
-	Vector<T, 3> localToGlobal(const Vector<T, 3>& lVec) const {
-		return rotation.localToGlobal(lVec) + position;
-	}
+        explicit CFrameTemplate(const T &x, const T &y, const T &z) : position(x, y, z), rotation()
+        {
+        }
 
-	Vector<T, 3> globalToLocal(const Vector<T, 3>& gVec) const {
-		return rotation.globalToLocal(gVec - position);
-	}
+        explicit CFrameTemplate(const T &x, const T &y, const T &z,
+                                const RotationTemplate<T> &rotation) : position(x, y, z), rotation(rotation)
+        {
+        }
 
-	Vector<T, 3> localToRelative(const Vector<T, 3>& lVec) const {
-		return rotation.localToGlobal(lVec);
-	}
+        explicit CFrameTemplate(const RotationTemplate<T> &rotation) : position(0, 0, 0), rotation(rotation)
+        {
+        }
 
-	Vector<T, 3> relativeToLocal(const Vector<T, 3>& rVec) const {
-		return rotation.globalToLocal(rVec);
-	}
+        CFrameTemplate() : position(0, 0, 0), rotation()
+        {
+        }
 
-	Vector<T, 3> globalToRelative(const Vector<T, 3> & gVec) const {
-		return gVec - position;
-	}
+        template<typename OtherT>
+        CFrameTemplate(const CFrameTemplate<OtherT> &other) : position(static_cast<Vector<T, 3>>(other.position)),
+                                                              rotation(static_cast<RotationTemplate<T>>(other.rotation))
+        {
+        }
 
-	Vector<T, 3> relativeToGlobal(const Vector<T, 3> & rVec) const {
-		return rVec + position;
-	}
+        Vector<T, 3> localToGlobal(const Vector<T, 3> &lVec) const
+        {
+            return rotation.localToGlobal(lVec) + position;
+        }
 
-	CFrameTemplate<T> localToGlobal(const CFrameTemplate<T>& lFrame) const {
-		return CFrameTemplate<T>(position + rotation.localToGlobal(lFrame.position), rotation.localToGlobal(lFrame.rotation));
-	}
+        Vector<T, 3> globalToLocal(const Vector<T, 3> &gVec) const
+        {
+            return rotation.globalToLocal(gVec - position);
+        }
 
-	CFrameTemplate<T> globalToLocal(const CFrameTemplate<T>& gFrame) const {
-		return CFrameTemplate<T>(rotation.globalToLocal(gFrame.position - position), rotation.globalToLocal(gFrame.rotation));
-	}
-	
-	CFrameTemplate<T> localToRelative(const CFrameTemplate<T>& lFrame) const {
-		return CFrameTemplate<T>(rotation.localToGlobal(lFrame.position), rotation.localToGlobal(lFrame.rotation));
-	}
+        Vector<T, 3> localToRelative(const Vector<T, 3> &lVec) const
+        {
+            return rotation.localToGlobal(lVec);
+        }
 
-	CFrameTemplate<T> relativeToLocal(const CFrameTemplate<T>& rFrame) const {
-		return CFrameTemplate<T>(rotation.globalToLocal(rFrame.position), rotation.globalToLocal(rFrame.rotation));
-	}
+        Vector<T, 3> relativeToLocal(const Vector<T, 3> &rVec) const
+        {
+            return rotation.globalToLocal(rVec);
+        }
 
-	CFrameTemplate<T> globalToRelative(const CFrameTemplate<T>& gFrame) const {
-		return CFrameTemplate<T>(gFrame.position - this->position, gFrame.rotation);
-	}
+        Vector<T, 3> globalToRelative(const Vector<T, 3> &gVec) const
+        {
+            return gVec - position;
+        }
 
-	CFrameTemplate<T> relativeToGlobal(const CFrameTemplate<T>& gFrame) const {
-		return CFrameTemplate<T>(gFrame.position + this->position, gFrame.rotation);
-	}
+        Vector<T, 3> relativeToGlobal(const Vector<T, 3> &rVec) const
+        {
+            return rVec + position;
+        }
 
-	RotationTemplate<T> localToGlobal(const RotationTemplate<T>& localRot) const {
-		return rotation.localToGlobal(localRot);
-	}
+        CFrameTemplate<T> localToGlobal(const CFrameTemplate<T> &lFrame) const
+        {
+            return CFrameTemplate<T>(position + rotation.localToGlobal(lFrame.position),
+                                     rotation.localToGlobal(lFrame.rotation));
+        }
 
-	RotationTemplate<T> globalToLocal(const RotationTemplate<T>& globalRot) const {
-		return rotation.globalToLocal(globalRot);
-	}
+        CFrameTemplate<T> globalToLocal(const CFrameTemplate<T> &gFrame) const
+        {
+            return CFrameTemplate<T>(rotation.globalToLocal(gFrame.position - position),
+                                     rotation.globalToLocal(gFrame.rotation));
+        }
 
-	CFrameTemplate<T> operator~() const {
-		return CFrameTemplate<T>(rotation.globalToLocal(-position), ~rotation);
-	}
+        CFrameTemplate<T> localToRelative(const CFrameTemplate<T> &lFrame) const
+        {
+            return CFrameTemplate<T>(rotation.localToGlobal(lFrame.position), rotation.localToGlobal(lFrame.rotation));
+        }
 
-	Vector<T, 3> getPosition() const {
-		return position;
-	}
+        CFrameTemplate<T> relativeToLocal(const CFrameTemplate<T> &rFrame) const
+        {
+            return CFrameTemplate<T>(rotation.globalToLocal(rFrame.position), rotation.globalToLocal(rFrame.rotation));
+        }
 
-	RotationTemplate<T> getRotation() const {
-		return rotation;
-	}
+        CFrameTemplate<T> globalToRelative(const CFrameTemplate<T> &gFrame) const
+        {
+            return CFrameTemplate<T>(gFrame.position - this->position, gFrame.rotation);
+        }
 
-	void translate(const Vector<T, 3>& delta) {
-		this->position += delta;
-	}
+        CFrameTemplate<T> relativeToGlobal(const CFrameTemplate<T> &gFrame) const
+        {
+            return CFrameTemplate<T>(gFrame.position + this->position, gFrame.rotation);
+        }
 
-	void rotate(const Rotation& rot) {
-		this->rotation = rot * this->rotation;
-	}
+        RotationTemplate<T> localToGlobal(const RotationTemplate<T> &localRot) const
+        {
+            return rotation.localToGlobal(localRot);
+        }
 
-	CFrameTemplate<T>& operator+=(const Vector<T, 3>& delta) {
-		position += delta;
-		return *this;
-	}
+        RotationTemplate<T> globalToLocal(const RotationTemplate<T> &globalRot) const
+        {
+            return rotation.globalToLocal(globalRot);
+        }
 
-	CFrameTemplate<T>& operator-=(const Vector<T, 3>& delta) {
-		position -= delta;
-		return *this;
-	}
+        CFrameTemplate<T> operator~() const
+        {
+            return CFrameTemplate<T>(rotation.globalToLocal(-position), ~rotation);
+        }
 
-	CFrameTemplate<T> operator+(const Vector<T, 3>& delta) const {
-		return CFrameTemplate<T>(this->position + delta, this->rotation);
-	}
+        Vector<T, 3> getPosition() const
+        {
+            return position;
+        }
 
-	CFrameTemplate<T> operator-(const Vector<T, 3>& delta) const {
-		return CFrameTemplate<T>(this->position - delta, this->rotation);
-	}
+        RotationTemplate<T> getRotation() const
+        {
+            return rotation;
+        }
 
-	CFrameTemplate<T> extendLocal(const Vector<T, 3>& delta) const {
-		return CFrameTemplate<T>(this->localToGlobal(delta), this->rotation);
-	}
+        void translate(const Vector<T, 3> &delta)
+        {
+            this->position += delta;
+        }
 
-	/*
-		Converts this CFrame to a 4x4 matrix, where for any Vec3 p:
-		cframe.asMat4() * Vec4(p, 1.0) == cframe.localToGlobal(p)
-	*/
-	Matrix<T, 4, 4> asMat4() const {
-		return Matrix<T, 4, 4>(rotation.asRotationMatrix(), this->position, Vector<T, 3>(), static_cast<T>(1));
-	}
+        void rotate(const Rotation &rot)
+        {
+            this->rotation = rot * this->rotation;
+        }
 
-	/*
-		Converts this CFrame to a 4x4 matrix with given scaling factor, where for any Vec3 p:
-		cframe.asMat4WithPreScale(scale) * Vec4(p, 1.0) == cframe.localToGlobal(scale * p)
-	*/
-	Matrix<T, 4, 4> asMat4WithPreScale(const DiagonalMatrix<T, 3>& scale) const {
-		return Matrix<T, 4, 4>(rotation.asRotationMatrix() * scale, this->position, Vector<T, 3>(), static_cast<T>(1));
-	}
+        CFrameTemplate<T> &operator+=(const Vector<T, 3> &delta)
+        {
+            position += delta;
+            return *this;
+        }
 
-	/*
-		Converts this CFrame to a 4x4 matrix with given scaling factor, where for any Vec3 p:
-		cframe.asMat4WithPostScale(scale) * Vec4(p, 1.0) == scale * cframe.localToGlobal(p)
-	*/
-	Matrix<T, 4, 4> asMat4WithPostScale(const DiagonalMatrix<T, 3>& scale) const {
-		return Matrix<T, 4, 4>(scale * rotation.asRotationMatrix(), this->position, Vector<T, 3>::ZEROS(), static_cast<T>(1));
-	}
-};
+        CFrameTemplate<T> &operator-=(const Vector<T, 3> &delta)
+        {
+            position -= delta;
+            return *this;
+        }
 
-typedef CFrameTemplate<double> CFrame;
-typedef CFrameTemplate<float> CFramef;
+        CFrameTemplate<T> operator+(const Vector<T, 3> &delta) const
+        {
+            return CFrameTemplate<T>(this->position + delta, this->rotation);
+        }
+
+        CFrameTemplate<T> operator-(const Vector<T, 3> &delta) const
+        {
+            return CFrameTemplate<T>(this->position - delta, this->rotation);
+        }
+
+        CFrameTemplate<T> extendLocal(const Vector<T, 3> &delta) const
+        {
+            return CFrameTemplate<T>(this->localToGlobal(delta), this->rotation);
+        }
+
+        /*
+            Converts this CFrame to a 4x4 matrix, where for any Vec3 p:
+            cframe.asMat4() * Vec4(p, 1.0) == cframe.localToGlobal(p)
+        */
+        Matrix<T, 4, 4> asMat4() const
+        {
+            return Matrix<T, 4, 4>(rotation.asRotationMatrix(), this->position, Vector<T, 3>(), static_cast<T>(1));
+        }
+
+        /*
+            Converts this CFrame to a 4x4 matrix with given scaling factor, where for any Vec3 p:
+            cframe.asMat4WithPreScale(scale) * Vec4(p, 1.0) == cframe.localToGlobal(scale * p)
+        */
+        Matrix<T, 4, 4> asMat4WithPreScale(const DiagonalMatrix<T, 3> &scale) const
+        {
+            return Matrix<T, 4, 4>(rotation.asRotationMatrix() * scale, this->position, Vector<T, 3>(),
+                                   static_cast<T>(1));
+        }
+
+        /*
+            Converts this CFrame to a 4x4 matrix with given scaling factor, where for any Vec3 p:
+            cframe.asMat4WithPostScale(scale) * Vec4(p, 1.0) == scale * cframe.localToGlobal(p)
+        */
+        Matrix<T, 4, 4> asMat4WithPostScale(const DiagonalMatrix<T, 3> &scale) const
+        {
+            return Matrix<T, 4, 4>(scale * rotation.asRotationMatrix(), this->position, Vector<T, 3>::ZEROS(),
+                                   static_cast<T>(1));
+        }
+    };
+
+    typedef CFrameTemplate<double> CFrame;
+    typedef CFrameTemplate<float> CFramef;
 };

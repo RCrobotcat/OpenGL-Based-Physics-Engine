@@ -1,9 +1,6 @@
 #pragma once
 
-#define OLC_PGE_APPLICATION
-
-#include "glacier_float.h"
-#include <cstdint>
+#include "Networking/Cpp-Game-Server/DeterministicFloat/glacier_float.h"
 
 enum class GameMsg : uint32_t {
     Server_GetStatus,
@@ -21,15 +18,7 @@ enum class GameMsg : uint32_t {
 
 struct sPlayerDescription {
     uint32_t nUniqueID = 0;
-    uint32_t nAvatarID = 0;
 
-    uint32_t nHealth = 100;
-    uint32_t nAmmo = 20;
-    uint32_t nKills = 0;
-    uint32_t nDeaths = 0;
-
-    float fRadius = 0.5f;
-
-    olc::vf2d vPos;
-    olc::vf2d vVel;
+    GFloat x, y, z; // position
+    GFloat qx, qy, qz, qw; // orientation
 };

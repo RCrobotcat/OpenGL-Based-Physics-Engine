@@ -7,18 +7,27 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Adds the Physics3D library
 add_subdirectory(Physics3D)
 
+# Bring in networking library target: cpp_game_server
+option(IF_PHYSICS_ENABLE_CPP_GAME_SERVER "Enable Cpp-Game-Server integration" ON)
+set(CPP_GAME_SERVER_DIR "${PROJECT_SOURCE_DIR}/Networking/Cpp-Game-Server")
+if(IF_PHYSICS_ENABLE_CPP_GAME_SERVER AND EXISTS "${CPP_GAME_SERVER_DIR}/CMakeLists.txt")
+    add_subdirectory(${CPP_GAME_SERVER_DIR} EXCLUDE_FROM_ALL)
+elseif(IF_PHYSICS_ENABLE_CPP_GAME_SERVER)
+    message(WARNING "Cpp-Game-Server not found at: ${CPP_GAME_SERVER_DIR}")
+endif()
+
 add_executable(IF_Physics
         # 主程序源文件
-        main.cpp
-        Shader.cpp
-        Shader.h
-        Mesh.cpp
-        Mesh.h
-        Model.cpp
-        Model.h
-        DrawObjects.cpp
-        DrawObjects.h
-        Camera.h
+        demo_offline.cpp
+        Common/Shader.cpp
+        Common/Shader.h
+        Common/Mesh.cpp
+        Common/Mesh.h
+        Common/Model.cpp
+        Common/Model.h
+        Common/DrawObjects.cpp
+        Common/DrawObjects.h
+        Common/Camera.h
 
         # GLAD
         dependencies/src/glad.c
@@ -61,6 +70,12 @@ target_link_libraries(IF_Physics PRIVATE
         # 系统库
         opengl32
 )
+
+if(TARGET cpp_game_server)
+    target_link_libraries(IF_Physics PRIVATE cpp_game_server)
+elseif(IF_PHYSICS_ENABLE_CPP_GAME_SERVER)
+    message(WARNING "Target cpp_game_server is unavailable, skip linking.")
+endif()
 
 if(MSVC)
     # Visual Studio 编译器选项

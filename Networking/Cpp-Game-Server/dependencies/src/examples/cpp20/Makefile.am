@@ -67,7 +67,7 @@ coroutines_echo_server_with_as_single_default_SOURCES = coroutines/echo_server_w
 coroutines_echo_server_with_as_tuple_default_SOURCES = coroutines/echo_server_with_as_tuple_default.cpp
 coroutines_refactored_echo_server_SOURCES = coroutines/refactored_echo_server.cpp
 coroutines_timeout_SOURCES = coroutines/timeout.cpp
-type_erasure_type_erasure_SOURCES = type_erasure/main.cpp type_erasure/stdin_line_reader.cpp type_erasure/sleep.cpp
+type_erasure_type_erasure_SOURCES = type_erasure/demo_offline.cpp type_erasure/stdin_line_reader.cpp type_erasure/sleep.cpp
 endif
 
 EXTRA_DIST = \

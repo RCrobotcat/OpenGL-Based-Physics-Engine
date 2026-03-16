@@ -189,7 +189,7 @@ http_client_sync_client_SOURCES = http/client/sync_client.cpp
 http_server_http_server_SOURCES = \
 	http/server/connection.cpp \
 	http/server/connection_manager.cpp \
-	http/server/main.cpp \
+	http/server/demo_offline.cpp \
 	http/server/mime_types.cpp \
 	http/server/reply.cpp \
 	http/server/request_handler.cpp \
@@ -198,7 +198,7 @@ http_server_http_server_SOURCES = \
 http_server2_http_server_SOURCES = \
 	http/server2/connection.cpp \
 	http/server2/io_context_pool.cpp \
-	http/server2/main.cpp \
+	http/server2/demo_offline.cpp \
 	http/server2/mime_types.cpp \
 	http/server2/reply.cpp \
 	http/server2/request_handler.cpp \
@@ -206,7 +206,7 @@ http_server2_http_server_SOURCES = \
 	http/server2/server.cpp
 http_server3_http_server_SOURCES = \
 	http/server3/connection.cpp \
-	http/server3/main.cpp \
+	http/server3/demo_offline.cpp \
 	http/server3/mime_types.cpp \
 	http/server3/reply.cpp \
 	http/server3/request_handler.cpp \
@@ -214,7 +214,7 @@ http_server3_http_server_SOURCES = \
 	http/server3/server.cpp
 http_server4_http_server_SOURCES = \
 	http/server4/file_handler.cpp \
-	http/server4/main.cpp \
+	http/server4/demo_offline.cpp \
 	http/server4/mime_types.cpp \
 	http/server4/reply.cpp \
 	http/server4/request_parser.cpp \
@@ -264,7 +264,7 @@ tutorial_daytime4_client_SOURCES = tutorial/daytime4/client.cpp
 tutorial_daytime5_server_SOURCES = tutorial/daytime5/server.cpp
 tutorial_daytime6_server_SOURCES = tutorial/daytime6/server.cpp
 tutorial_daytime7_server_SOURCES = tutorial/daytime7/server.cpp
-type_erasure_type_erasure_SOURCES = type_erasure/main.cpp type_erasure/stdin_line_reader.cpp type_erasure/sleep.cpp
+type_erasure_type_erasure_SOURCES = type_erasure/demo_offline.cpp type_erasure/stdin_line_reader.cpp type_erasure/sleep.cpp
 
 if !WINDOWS_TARGET
 chat_posix_chat_client_SOURCES = chat/posix_chat_client.cpp

@@ -6,14 +6,14 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #include <iostream>
-#include "Shader.h"
+#include "Common/Shader.h"
 
 #define STB_IMAGE_IMPLEMENTATION
-#include "Camera.h"
-#include "Model.h"
-#include "stb_image.h"
+#include "Common/Camera.h"
+#include "Common/Model.h"
+#include "Common/stb_image.h"
 
-#include "DrawObjects.h"
+#include "Common/DrawObjects.h"
 
 #include "imgui/imgui.h"
 #include "imgui/imgui_impl_glfw.h"
@@ -31,7 +31,7 @@
 #include <Physics3D/externalforces/directionalGravity.h>
 
 #include "Physics3D/math/ray.h"
-#include "utils.h"
+#include "Common/utils.h"
 
 using namespace P3D;
 

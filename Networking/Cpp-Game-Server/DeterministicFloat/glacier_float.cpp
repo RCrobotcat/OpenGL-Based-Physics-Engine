@@ -183,9 +183,9 @@ void GFloat::Init()
         GFixed30 SinValue = GFixed30::FromGFloat( GSin );
         GFixed30 CosValue = GFixed30::FromGFloat(GCos);
 
-    //    std::cout << SinValue.rawInt32 << ", " << CosValue.rawInt32<< ", " ;
+        //    std::cout << SinValue.rawInt32 << ", " << CosValue.rawInt32<< ", " ;
 
-    //    if ((i + 1) % 4 == 0)
+        //    if ((i + 1) % 4 == 0)
         //    std::cout << std::endl;
 
         //ms_SinCosTable[i*2] = SinValue.rawInt32;

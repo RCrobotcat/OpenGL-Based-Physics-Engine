@@ -4,6 +4,16 @@ project(cpp_game_server)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# DeterministicFloat: build as a reusable library for all demos/servers.
+add_library(deterministic_float STATIC
+        DeterministicFloat/deterministic_float.cpp
+        DeterministicFloat/glacier_float.cpp
+)
+
+target_include_directories(deterministic_float PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/DeterministicFloat
+)
+
 add_library(cpp_game_server INTERFACE)
 
 # cpp_game_server 的头文件路径
@@ -34,6 +44,8 @@ if (WIN32)
     target_link_libraries(simple_client PRIVATE ws2_32 mswsock iphlpapi)
 endif()
 
+target_link_libraries(simple_client PRIVATE deterministic_float)
+
 # 另一个可执行程序 simple_server
 add_executable(simple_server
         Examples/NetServer/SimpleServer.cpp
@@ -49,6 +61,8 @@ target_compile_definitions(simple_server PRIVATE ASIO_STANDALONE)
 if (WIN32)
     target_link_libraries(simple_server PRIVATE ws2_32 mswsock iphlpapi)
 endif()
+
+target_link_libraries(simple_server PRIVATE deterministic_float)
 
 # 另一个可执行程序 CircleVsRect
 add_executable(CircleVsRect
@@ -80,6 +94,8 @@ if (WIN32)
     target_link_libraries(CircleVsRect PRIVATE ws2_32 mswsock iphlpapi)
 endif()
 
+target_link_libraries(CircleVsRect PRIVATE deterministic_float)
+
 # 另一个可执行程序 MMO_server
 add_executable(MMO_server
         Examples/Games/MMO_server.cpp
@@ -110,6 +126,8 @@ if (WIN32)
     target_link_libraries(MMO_server PRIVATE ws2_32 mswsock iphlpapi)
 endif()
 
+target_link_libraries(MMO_server PRIVATE deterministic_float)
+
 # 另一个可执行程序 Unity_server
 add_executable(Unity_server
         Examples/UnityConnection/Unity_server.cpp
@@ -138,6 +156,8 @@ target_compile_definitions(Unity_server PRIVATE ASIO_STANDALONE)
 if (WIN32)
     target_link_libraries(Unity_server PRIVATE ws2_32 mswsock iphlpapi)
 endif()
+
+target_link_libraries(Unity_server PRIVATE deterministic_float)
 
 if (MINGW)
     target_link_options(Unity_server PRIVATE

@@ -494,7 +494,7 @@ tests\unit\unit_test.obj: tests\unit\unit_test.cpp
 examples\cpp11\http\server\http_server.exe: \
 		examples\cpp11\http\server\connection.cpp \
 		examples\cpp11\http\server\connection_manager.cpp \
-		examples\cpp11\http\server\main.cpp \
+		examples\cpp11\http\server\demo_offline.cpp \
 		examples\cpp11\http\server\mime_types.cpp \
 		examples\cpp11\http\server\reply.cpp \
 		examples\cpp11\http\server\request_handler.cpp \
@@ -505,7 +505,7 @@ examples\cpp11\http\server\http_server.exe: \
 examples\cpp11\http\server2\http_server.exe: \
 		examples\cpp11\http\server2\connection.cpp \
 		examples\cpp11\http\server2\io_context_pool.cpp \
-		examples\cpp11\http\server2\main.cpp \
+		examples\cpp11\http\server2\demo_offline.cpp \
 		examples\cpp11\http\server2\mime_types.cpp \
 		examples\cpp11\http\server2\reply.cpp \
 		examples\cpp11\http\server2\request_handler.cpp \
@@ -515,7 +515,7 @@ examples\cpp11\http\server2\http_server.exe: \
 
 examples\cpp11\http\server3\http_server.exe: \
 		examples\cpp11\http\server3\connection.cpp \
-		examples\cpp11\http\server3\main.cpp \
+		examples\cpp11\http\server3\demo_offline.cpp \
 		examples\cpp11\http\server3\mime_types.cpp \
 		examples\cpp11\http\server3\reply.cpp \
 		examples\cpp11\http\server3\request_handler.cpp \
@@ -525,7 +525,7 @@ examples\cpp11\http\server3\http_server.exe: \
 
 examples\cpp11\http\server4\http_server.exe: \
 		examples\cpp11\http\server4\file_handler.cpp \
-		examples\cpp11\http\server4\main.cpp \
+		examples\cpp11\http\server4\demo_offline.cpp \
 		examples\cpp11\http\server4\mime_types.cpp \
 		examples\cpp11\http\server4\reply.cpp \
 		examples\cpp11\http\server4\request_parser.cpp \
