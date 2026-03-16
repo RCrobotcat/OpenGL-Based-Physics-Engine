@@ -280,7 +280,7 @@ int main()
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
     glfwSetCursorPosCallback(window, mouse_callback);
     glfwSetScrollCallback(window, scroll_callback);
-    //glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
     if (!gladLoadGLLoader((GLADloadproc) glfwGetProcAddress))
     {
@@ -775,7 +775,7 @@ int main()
             glm::mat4 model(1.0f);
             model = glm::translate(model, pos);
             model *= glm::mat4_cast(q);
-            model = glm::scale(model, glm::vec3(1.0f, 1.8f, 1.0f));
+            model = glm::scale(model, glm::vec3(1.2f, 1.8f, 1.2f));
 
             pbrShader.setMat4("model", model);
             pbrShader.setMat3("normalMatrix", glm::transpose(glm::inverse(glm::mat3(model))));

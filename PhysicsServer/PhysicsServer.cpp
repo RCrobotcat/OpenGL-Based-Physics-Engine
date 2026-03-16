@@ -160,7 +160,7 @@ private:
     void setupWorld()
     {
         m_playerProperties.density = 20.0;
-        m_playerProperties.friction = 0.7;
+        m_playerProperties.friction = 0.5;
         m_playerProperties.bouncyness = 0.01;
 
         m_terrainProperties.density = 15.0;
@@ -336,7 +336,7 @@ private:
         }
 
         auto player = std::make_unique<ServerEntityPart>(
-            cylinderShape(0.5, 1.8),
+            cylinderShape(1.0f, m_playerHeight), // radius, height
             makeSpawnCFrame(clientID),
             m_playerProperties, ServerEntityPart::Type::PLAYER);
 
@@ -353,6 +353,13 @@ private:
         defaultInput.yaw = GFloat::Zero();
         defaultInput.jumpPressed = 0;
         defaultInput.shooting = 0;
+        defaultInput.firePosX = GFloat::Zero();
+        defaultInput.firePosY = GFloat::Zero();
+        defaultInput.firePosZ = GFloat::Zero();
+        defaultInput.dirX = GFloat::Zero();
+        defaultInput.dirY = GFloat::Zero();
+        defaultInput.dirZ = GFloat::Zero();
+
         m_playerInputs.insert_or_assign(clientID, defaultInput);
         m_playerControlStates.insert_or_assign(clientID, PlayerControlState{});
 
@@ -442,7 +449,8 @@ private:
 
             const double moveX = std::clamp(toDouble(input.moveX), -1.0, 1.0);
             const double moveZ = std::clamp(toDouble(input.moveZ), -1.0, 1.0);
-            const double yaw = toDouble(input.yaw);
+            const double yawInput = toDouble(input.yaw);
+            const double yaw = std::isfinite(yawInput) ? yawInput : 0.0;
             const bool jumpNow = (input.jumpPressed != 0);
 
             const bool shootNow = (input.shooting != 0);
@@ -458,17 +466,23 @@ private:
             Vec3 velocity = part.getVelocity();
             velocity.x = moveX * m_playerMoveSpeed;
             velocity.z = moveZ * m_playerMoveSpeed;
-            velocity.y = 0;
 
             // jump
             const bool jumpTriggered = jumpNow && !controlState.jumpPressedLast;
             controlState.jumpPressedLast = jumpNow;
             if (jumpTriggered && isPlayerGrounded(part))
             {
-                //velocity.y = m_playerJumpSpeed;
+                velocity.y = m_playerJumpSpeed;
             }
 
             part.setVelocity(velocity);
+
+            // 强制朝向时会带着 x/z 翻滚角动量进入接触解算，导致直接弹射起飞!
+            // 因此要把x和z的角速度清零
+            Vec3 angularVelocity = part.getAngularVelocity();
+            angularVelocity.x = 0.0;
+            angularVelocity.z = 0.0;
+            part.setAngularVelocity(angularVelocity);
 
             GlobalCFrame frame = part.getCFrame();
             frame.rotation = Rotation::rotY(yaw);
@@ -588,7 +602,7 @@ private:
     uint32_t m_nextDynamicObjectID = 1;
 
     const double m_playerHeight = 1.8;
-    const double m_playerMoveSpeed = 10.0;
+    const double m_playerMoveSpeed = 15.0;
     const double m_playerJumpSpeed = 5.0;
     const double m_fireRate = 10.0;
     const double m_fireRange = 100.0;
