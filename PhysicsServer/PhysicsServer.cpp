@@ -363,6 +363,8 @@ private:
         m_playerInputs.insert_or_assign(clientID, defaultInput);
         m_playerControlStates.insert_or_assign(clientID, PlayerControlState{});
 
+        m_connections.insert_or_assign(clientID, client);
+
         RCNet::net::message<DemoGameMsg> assignID;
         assignID.header.id = DemoGameMsg::Client_AssignID;
         assignID << clientID;
@@ -400,6 +402,7 @@ private:
         }
 
         m_world.removePart(it->second.get());
+        m_connections.erase(clientID);
         m_playerParts.erase(it);
         m_playerInputs.erase(clientID);
         m_playerControlStates.erase(clientID);
@@ -500,7 +503,8 @@ private:
         }
     }
 
-    void tryShoot(ServerEntityPart &shooter, double posx, double posy, double posz, double dirx, double diry, double dirz)
+    void tryShoot(ServerEntityPart &shooter, double posx, double posy, double posz, double dirx, double diry,
+                  double dirz)
     {
         Position rayOriginPos(posx, posy, posz);
         Vec3 rayOrigin(rayOriginPos.x, rayOriginPos.y, rayOriginPos.z);
@@ -509,24 +513,37 @@ private:
 
         RaycastResult<ServerEntityPart> hit;
         Ray ray(rayOriginPos, rayDir);
-        bool ok = performRaycast(ray, m_world, hit, static_cast<double>(m_fireRange));
+        const bool ok = performRaycast(ray, m_world, hit, static_cast<double>(m_fireRange));
 
-        ServerEntityPart *bestPart = hit.hitPart;
-        double bestT = hit.distance;
-        Vec3 hitPos = rayOrigin + rayDir * bestT;
-        Vec3 impulse = rayDir * m_fireImpulse;
-        try
+        if (ok && hit.hitPart != nullptr)
         {
+            ServerEntityPart *bestPart = hit.hitPart;
+            const double bestT = hit.distance;
+            const Vec3 hitPos = rayOrigin + rayDir * bestT;
+            const Vec3 impulse = rayDir * m_fireImpulse;
+
             if (bestPart->entityType != ServerEntityPart::Type::PLANE && bestPart->entityType !=
-                ServerEntityPart::Type::WALL)
+                ServerEntityPart::Type::WALL && bestPart->entityType != ServerEntityPart::Type::PLAYER)
             {
                 Vec3 partCenter = castPositionToVec3(bestPart->getCFrame().position);
                 bestPart->applyImpulse(hitPos - partCenter, impulse);
             }
-        } catch (...)
-        {
-            // ignore
         }
+
+        RCNet::net::message<DemoGameMsg> syncMsg;
+        syncMsg.header.id = DemoGameMsg::Game_SyncOtherPlayersBullets;
+        sBulletDescription bulletDesc{};
+        bulletDesc.playerID = shooter.playerID;
+        bulletDesc.x = toGFloat(posx);
+        bulletDesc.y = toGFloat(posy);
+        bulletDesc.z = toGFloat(posz);
+        bulletDesc.dirX = toGFloat(dirx);
+        bulletDesc.dirY = toGFloat(diry);
+        bulletDesc.dirZ = toGFloat(dirz);
+        syncMsg << bulletDesc;
+        MessageAllClients(syncMsg, m_connections.find(shooter.playerID) != m_connections.end()
+                                       ? m_connections[shooter.playerID]
+                                       : nullptr);
 
         // if (bestPart->entityType != ServerEntityPart::Type::PLANE && bestPart->entityType !=
         //     ServerEntityPart::Type::WALL)
@@ -593,6 +610,8 @@ private:
     PartProperties m_terrainProperties{};
     PartProperties m_dynamicObjectProperties{};
 
+    // playerID -> playerConnection
+    std::unordered_map<uint32_t, std::shared_ptr<RCNet::net::connection<DemoGameMsg>>> m_connections;
     std::unordered_map<uint32_t, std::unique_ptr<ServerEntityPart>> m_playerParts; // playerID -> playerPart
     std::unordered_map<uint32_t, sPlayerInput> m_playerInputs; // playerID -> playerInputs
     std::unordered_map<uint32_t, PlayerControlState> m_playerControlStates; // playerID -> edge-trigger state

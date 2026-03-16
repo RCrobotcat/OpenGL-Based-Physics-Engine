@@ -16,7 +16,7 @@ elseif(IF_PHYSICS_ENABLE_CPP_GAME_SERVER)
     message(WARNING "Cpp-Game-Server not found at: ${CPP_GAME_SERVER_DIR}")
 endif()
 
-add_executable(IF_Physics
+add_executable(IF_Physics_Offline
         # 主程序源文件
         demo_offline.cpp
         Common/Shader.cpp
@@ -68,7 +68,7 @@ add_executable(IF_Physics_Online
         dependencies/include/imgui/cpp/imgui_impl_opengl3.cpp
 )
 
-target_include_directories(IF_Physics PRIVATE
+target_include_directories(IF_Physics_Offline PRIVATE
         ${PROJECT_SOURCE_DIR}
         ${PROJECT_SOURCE_DIR}/dependencies/include
         ${PROJECT_SOURCE_DIR}/dependencies/include/assimp
@@ -98,7 +98,7 @@ target_include_directories(IF_Physics_Online PRIVATE
 link_directories(${PROJECT_SOURCE_DIR}/dependencies/lib)
 
 # 链接库
-target_link_libraries(IF_Physics PRIVATE
+target_link_libraries(IF_Physics_Offline PRIVATE
         Physics3D
         # 第三方库
         ${PROJECT_SOURCE_DIR}/dependencies/lib/libassimpd.dll.a
@@ -118,7 +118,7 @@ target_link_libraries(IF_Physics_Online PRIVATE
 )
 
 if(TARGET cpp_game_server)
-    target_link_libraries(IF_Physics PRIVATE cpp_game_server)
+    target_link_libraries(IF_Physics_Offline PRIVATE cpp_game_server)
     target_link_libraries(IF_Physics_Online PRIVATE cpp_game_server)
 elseif(IF_PHYSICS_ENABLE_CPP_GAME_SERVER)
     message(WARNING "Target cpp_game_server is unavailable, skip linking.")
@@ -159,7 +159,7 @@ if(MSVC)
     endif()
 else()
     # GCC/Clang 编译器选项
-    target_compile_options(IF_Physics PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(IF_Physics_Offline PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(IF_Physics_Online PRIVATE -Wall -Wextra -Wpedantic)
     if(TARGET PhysicsServer)
         target_compile_options(PhysicsServer PRIVATE -Wall -Wextra -Wpedantic)

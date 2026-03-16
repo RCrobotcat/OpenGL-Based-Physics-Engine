@@ -41,13 +41,14 @@ struct NetDynamicObjectState
     sDynamicObjectDescription desc{};
 };
 
-struct Bullet
+struct _Bullet
 {
     glm::vec3 position;
     glm::vec3 velocity;
     float life;
 };
-std::vector<Bullet> g_bullets;
+
+std::vector<_Bullet> g_bullets;
 
 struct TextureSet
 {
@@ -84,8 +85,8 @@ public:
     }
 };
 
-static const unsigned int SCR_WIDTH = 1280;
-static const unsigned int SCR_HEIGHT = 720;
+static const unsigned int SCR_WIDTH = 1024;
+static const unsigned int SCR_HEIGHT = 768;
 
 static Camera camera(glm::vec3(0.0f, 2.0f, 10.0f));
 static float lastX = SCR_WIDTH / 2.0f;
@@ -111,7 +112,7 @@ static constexpr float g_fireRate = 10.0f;
 static constexpr float g_bulletSpeed = 200.0f;
 static constexpr float g_bulletLife = 2.0f;
 
-static void SpawnLocalBulletTrace()
+static void SpawnLocal_BulletTrace()
 {
     glm::vec3 dir = glm::normalize(camera.Front);
 
@@ -119,7 +120,7 @@ static void SpawnLocalBulletTrace()
     glm::vec4 muzzleLocal(0.12f, -0.2f, -0.40f, 1.0f);
     glm::vec3 startPos = glm::vec3(invView * muzzleLocal);
 
-    Bullet b;
+    _Bullet b;
     b.position = startPos;
     b.velocity = dir * g_bulletSpeed;
     b.life = g_bulletLife;
@@ -189,6 +190,10 @@ static void HandleIncoming(DemoClient &client)
             }
             case DemoGameMsg::Client_AssignID:
             {
+                if (msg.body.size() < sizeof(uint32_t))
+                {
+                    break;
+                }
                 uint32_t id = 0;
                 msg >> id;
                 g_localPlayerID = id;
@@ -197,6 +202,10 @@ static void HandleIncoming(DemoClient &client)
             case DemoGameMsg::Game_AddPlayer:
             case DemoGameMsg::Game_UpdatePlayer:
             {
+                if (msg.body.size() < sizeof(sPlayerDescription))
+                {
+                    break;
+                }
                 sPlayerDescription desc{};
                 msg >> desc;
                 g_players[desc.nUniqueID] = NetPlayerState{desc};
@@ -204,6 +213,10 @@ static void HandleIncoming(DemoClient &client)
             }
             case DemoGameMsg::Game_RemovePlayer:
             {
+                if (msg.body.size() < sizeof(uint32_t))
+                {
+                    break;
+                }
                 uint32_t id = 0;
                 msg >> id;
                 g_players.erase(id);
@@ -211,9 +224,31 @@ static void HandleIncoming(DemoClient &client)
             }
             case DemoGameMsg::Game_UpdateDynamicObject:
             {
+                if (msg.body.size() < sizeof(sDynamicObjectDescription))
+                {
+                    break;
+                }
                 sDynamicObjectDescription desc{};
                 msg >> desc;
                 g_dynamicObjects[desc.objectID] = NetDynamicObjectState{desc};
+                break;
+            }
+            case DemoGameMsg::Game_SyncOtherPlayersBullets:
+            {
+                if (msg.body.size() < sizeof(sBulletDescription))
+                {
+                    break;
+                }
+                sBulletDescription desc{};
+                msg >> desc;
+                if (desc.playerID != g_localPlayerID)
+                {
+                    _Bullet b;
+                    b.position = glm::vec3(toFloat(desc.x), toFloat(desc.y), toFloat(desc.z));
+                    b.velocity = glm::vec3(toFloat(desc.dirX), toFloat(desc.dirY), toFloat(desc.dirZ)) * g_bulletSpeed;
+                    b.life = g_bulletLife;
+                    g_bullets.push_back(b);
+                }
                 break;
             }
             default:
@@ -640,7 +675,7 @@ int main()
         g_firePressedLast = fireNow;
         if (fireTriggered && g_fireCooldown <= 0.0f)
         {
-            SpawnLocalBulletTrace();
+            SpawnLocal_BulletTrace();
             g_fireCooldown = 1.0f / g_fireRate;
         }
 
@@ -775,7 +810,7 @@ int main()
             glm::mat4 model(1.0f);
             model = glm::translate(model, pos);
             model *= glm::mat4_cast(q);
-            model = glm::scale(model, glm::vec3(1.2f, 1.8f, 1.2f));
+            model = glm::scale(model, glm::vec3(2.0f, 2.7f, 2.0f));
 
             pbrShader.setMat4("model", model);
             pbrShader.setMat3("normalMatrix", glm::transpose(glm::inverse(glm::mat3(model))));

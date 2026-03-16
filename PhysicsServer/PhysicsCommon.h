@@ -15,6 +15,7 @@ enum class DemoGameMsg : uint32_t {
     Game_AddPlayer,
     Game_RemovePlayer,
     Game_UpdatePlayer,
+    Game_SyncOtherPlayersBullets,
 
     Game_UpdateDynamicObject,
 
@@ -62,4 +63,11 @@ struct sPlayerInput {
     uint8_t shooting = 0;
     GFloat firePosX, firePosY, firePosZ;
     GFloat dirX, dirY, dirZ;
+};
+
+struct sBulletDescription
+{
+    uint32_t playerID;
+    GFloat x, y, z; // start position
+    GFloat dirX, dirY, dirZ; // direction
 };
