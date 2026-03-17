@@ -804,7 +804,7 @@ int main()
             glActiveTexture(GL_TEXTURE7);
             glBindTexture(GL_TEXTURE_2D, ironAOMap);
 
-            glm::vec3 pos(toFloat(desc.x), toFloat(desc.y), toFloat(desc.z));
+            glm::vec3 pos(toFloat(desc.x), toFloat(desc.y) + 1.6f, toFloat(desc.z));
             glm::quat q(toFloat(desc.qw), toFloat(desc.qx), toFloat(desc.qy), toFloat(desc.qz));
 
             glm::mat4 model(1.0f);
