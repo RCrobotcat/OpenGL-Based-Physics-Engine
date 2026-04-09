@@ -341,6 +341,18 @@ namespace P3D
                 float w = (d00 * d21 - d01 * d20) / denom;
                 float u = 1.0f - v - w;
 
+                // 叉乘法计算重心坐标
+                // Vec3f n = (b - a) % (c - a);
+                //
+                // // The area of a triangle is
+                // float areaABC = n * ((b - a) % (c - a));
+                // float areaPBC = n * ((b - exitVector) % (c - exitVector));
+                // float areaPCA = n * ((c - exitVector) % (a - exitVector));
+                //
+                // float u = areaPBC / areaABC; // alpha
+                // float v = areaPCA / areaABC; // beta
+                // float w = 1.0f - v - u; // gamma
+
                 Vec3f A0 = inds[0][0], A1 = inds[1][0], A2 = inds[2][0];
                 Vec3f B0 = inds[0][1], B1 = inds[1][1], B2 = inds[2][1];
 

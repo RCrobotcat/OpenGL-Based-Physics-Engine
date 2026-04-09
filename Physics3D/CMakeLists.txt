@@ -106,6 +106,9 @@ find_library(GLFW_LIB NAMES glfw3 glfw3dll PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../
 add_executable(Physics3D_Test examples/test.cpp)
 target_link_libraries(Physics3D_Test PRIVATE Physics3D glad ${GLFW_LIB} OpenGL::GL)
 
+add_executable(ProfilerTest examples/profilerTest/profilerTest.cpp)
+target_link_libraries(ProfilerTest PRIVATE Physics3D glad ${GLFW_LIB} OpenGL::GL)
+
 if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
   set_source_files_properties(geometry/triangleMeshSSE.cpp PROPERTIES COMPILE_FLAGS /arch:SSE2)
   set_source_files_properties(geometry/triangleMeshSSE4.cpp PROPERTIES COMPILE_FLAGS /arch:SSE2)
