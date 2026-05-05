@@ -37,8 +37,7 @@ using namespace P3D;
 
 // Helper to convert Physics3D Mat4f to glm::mat4
 template<typename T>
-glm::mat4 toGlm(const P3D::Matrix<T, 4, 4> &mat)
-{
+glm::mat4 toGlm(const P3D::Matrix<T, 4, 4> &mat) {
     glm::mat4 result;
     float data[16];
     P3D::Matrix<float, 4, 4>(mat).toColMajorData(data);
@@ -46,8 +45,7 @@ glm::mat4 toGlm(const P3D::Matrix<T, 4, 4> &mat)
     return result;
 }
 
-struct Bullet
-{
+struct Bullet {
     glm::vec3 position;
     glm::vec3 velocity;
     float life;
@@ -56,8 +54,7 @@ struct Bullet
 std::vector<Bullet> g_bullets;
 
 // Custom Part to hold rendering info
-class CustomPart : public Part
-{
+class CustomPart : public Part {
 public:
     enum Type { SPHERE, CUBE, PLANE, WALL, MODEL };
 
@@ -69,12 +66,10 @@ public:
 
     CustomPart(const Shape &shape, const GlobalCFrame &position, const PartProperties &properties, Type type,
                int materialIndex = 0)
-        : Part(shape, position, properties), type(type), materialIndex(materialIndex)
-    {
+        : Part(shape, position, properties), type(type), materialIndex(materialIndex) {
     }
 
-    void applyImpulse(Vec3 relativeOrigin, Vec3 impulse)
-    {
+    void applyImpulse(Vec3 relativeOrigin, Vec3 impulse) {
         constexpr double dt = 1.0 / 100.0; // 与 world 步长一致
         applyForce(relativeOrigin, impulse / dt);
     }
@@ -130,8 +125,7 @@ float g_playerJumpSpeed = 5.0f;
 float g_playerEyeHeight = 0.75f;
 bool g_jumpPressedLast = false;
 
-int main()
-{
+int main() {
     glfwInit();
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
@@ -142,8 +136,7 @@ int main()
 #endif
 
     GLFWwindow *window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "PhysicsEngineDemo", NULL, NULL);
-    if (window == NULL)
-    {
+    if (window == NULL) {
         std::cout << "Failed to create GLFW window" << std::endl;
         glfwTerminate();
         return -1;
@@ -152,8 +145,7 @@ int main()
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
     glfwSetScrollCallback(window, scroll_callback);
 
-    if (!gladLoadGLLoader((GLADloadproc) glfwGetProcAddress))
-    {
+    if (!gladLoadGLLoader((GLADloadproc) glfwGetProcAddress)) {
         std::cout << "Failed to initialize GLAD" << std::endl;
         return -1;
     }
@@ -188,7 +180,7 @@ int main()
     glDepthFunc(GL_LEQUAL); // set depth function to less than AND equal for skybox depth trick.
 
     // shaders
-    Shader pbrShader("../shaders/PBR/IBL/pbr.vs", "../shaders/PBR/IBL/pbr.fs");
+    Shader pbrShader("../shaders/PBR/IBL/pbr_shadow.vs", "../shaders/PBR/IBL/pbr_shadow.fs");
     Shader equirectangularToCubemapShader("../shaders/PBR/IBL/cubemap.vs",
                                           "../shaders/PBR/IBL/equirectangular_to_cubemap.fs");
 
@@ -206,6 +198,12 @@ int main()
     // model
     Model gunModel("../models/Cerberus_by_Andrew_Maximov/Cerberus_LP.FBX");
 
+    // shadow map
+    Shader simpleDepthShader("../shaders/ShadowMapping/shadow_mapping_depth.vs",
+                             "../shaders/ShadowMapping/shadow_mapping_depth.fs");
+    Shader shadowDebugShader("../shaders/ShadowMapping/debug_quad.vs",
+                             "../shaders/ShadowMapping/debug_quad.fs");
+
     pbrShader.use();
     pbrShader.setInt("irradianceMap", 0);
     pbrShader.setInt("prefilterMap", 1);
@@ -215,6 +213,7 @@ int main()
     pbrShader.setInt("metallicMap", 5);
     pbrShader.setInt("roughnessMap", 6);
     pbrShader.setInt("aoMap", 7);
+    pbrShader.setInt("shadowMap", 8);
 
     backgroundShader.use();
     backgroundShader.setInt("environmentMap", 0);
@@ -346,8 +345,7 @@ int main()
 
     // Spheres
     // Positions from original code: (-5, 0, 2), (-3, 0, 2), (-1, 0, 2), (1, 0, 2), (3, 0, 2)
-    struct SphereInit
-    {
+    struct SphereInit {
         double x, y, z;
         int materialIndex;
     };
@@ -359,8 +357,7 @@ int main()
         {3.0, 18.0, 2.0, 1} // Gold
     };
 
-    struct BoxInit
-    {
+    struct BoxInit {
         double x, y, z;
         int materialIndex;
     };
@@ -372,11 +369,10 @@ int main()
         {4.0, 14.0, 5.0, 1} // Gold
     };
 
-    std::vector<std::unique_ptr<CustomPart>> parts;
+    std::vector<std::unique_ptr<CustomPart> > parts;
 
     // add spheres
-    for (const auto &s: sphereInits)
-    {
+    for (const auto &s: sphereInits) {
         auto part = std::make_unique<CustomPart>(
             sphereShape(1.0),
             GlobalCFrame(s.x, s.y, s.z),
@@ -389,8 +385,7 @@ int main()
     }
 
     // add boxes
-    for (const auto &b: boxInits)
-    {
+    for (const auto &b: boxInits) {
         auto part = std::make_unique<CustomPart>(
             boxShape(2.0, 2.0, 2.0),
             GlobalCFrame(b.x, b.y, b.z),
@@ -445,8 +440,7 @@ int main()
     float *data = stbi_loadf("../Textures/hdr/newport_loft.hdr",
                              &width, &height, &nrComponents, 0);
     unsigned int hdrTexture;
-    if (data)
-    {
+    if (data) {
         glGenTextures(1, &hdrTexture);
         glBindTexture(GL_TEXTURE_2D, hdrTexture);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_FLOAT,
@@ -458,8 +452,7 @@ int main()
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
         stbi_image_free(data);
-    } else
-    {
+    } else {
         std::cout << "Failed to load HDR image." << std::endl;
     }
 
@@ -468,8 +461,7 @@ int main()
     unsigned int envCubemap;
     glGenTextures(1, &envCubemap);
     glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
-    for (unsigned int i = 0; i < 6; ++i)
-    {
+    for (unsigned int i = 0; i < 6; ++i) {
         glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, 512, 512, 0, GL_RGB, GL_FLOAT, nullptr);
     }
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -504,8 +496,7 @@ int main()
 
     glViewport(0, 0, 512, 512); // don't forget to configure the viewport to the capture dimensions.
     glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
-    for (unsigned int i = 0; i < 6; ++i)
-    {
+    for (unsigned int i = 0; i < 6; ++i) {
         equirectangularToCubemapShader.setMat4("view", captureViews[i]);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, envCubemap, 0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -523,8 +514,7 @@ int main()
     unsigned int irradianceMap;
     glGenTextures(1, &irradianceMap);
     glBindTexture(GL_TEXTURE_CUBE_MAP, irradianceMap);
-    for (unsigned int i = 0; i < 6; ++i)
-    {
+    for (unsigned int i = 0; i < 6; ++i) {
         glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, 32, 32, 0, GL_RGB, GL_FLOAT, nullptr);
     }
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -547,8 +537,7 @@ int main()
 
     glViewport(0, 0, 32, 32); // don't forget to configure the viewport to the capture dimensions.
     glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
-    for (unsigned int i = 0; i < 6; ++i)
-    {
+    for (unsigned int i = 0; i < 6; ++i) {
         irradianceShader.setMat4("view", captureViews[i]);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, irradianceMap,
                                0);
@@ -563,8 +552,7 @@ int main()
     unsigned int prefilterMap;
     glGenTextures(1, &prefilterMap);
     glBindTexture(GL_TEXTURE_CUBE_MAP, prefilterMap);
-    for (unsigned int i = 0; i < 6; ++i)
-    {
+    for (unsigned int i = 0; i < 6; ++i) {
         glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, 128, 128, 0, GL_RGB, GL_FLOAT, nullptr);
     }
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -586,8 +574,7 @@ int main()
 
     glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
     unsigned int maxMipLevels = 5;
-    for (unsigned int mip = 0; mip < maxMipLevels; ++mip)
-    {
+    for (unsigned int mip = 0; mip < maxMipLevels; ++mip) {
         // reisze framebuffer according to mip-level size.
         unsigned int mipWidth = static_cast<unsigned int>(128 * std::pow(0.5, mip));
         unsigned int mipHeight = static_cast<unsigned int>(128 * std::pow(0.5, mip));
@@ -597,8 +584,7 @@ int main()
 
         float roughness = (float) mip / (float) (maxMipLevels - 1);
         prefilterShader.setFloat("roughness", roughness);
-        for (unsigned int i = 0; i < 6; ++i)
-        {
+        for (unsigned int i = 0; i < 6; ++i) {
             prefilterShader.setMat4("view", captureViews[i]);
             glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i,
                                    prefilterMap, mip);
@@ -649,13 +635,41 @@ int main()
     glm::mat4 weaponProjection = glm::perspective(glm::radians(60.0f), (float) SCR_WIDTH / (float) SCR_HEIGHT,
                                                   0.01f, 1000.0f);
 
+    // configure depth map FBO
+    // -----------------------
+    const unsigned int SHADOW_WIDTH = 1024, SHADOW_HEIGHT = 1024;
+    unsigned int depthMapFBO;
+    glGenFramebuffers(1, &depthMapFBO);
+    // create depth texture
+    unsigned int depthMap;
+    glGenTextures(1, &depthMap);
+    glBindTexture(GL_TEXTURE_2D, depthMap);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT,
+                 GL_FLOAT,NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+    float borderColor[] = {1.0, 1.0, 1.0, 1.0};
+    glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
+    // attach depth texture as FBO's depth buffer
+    glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthMap, 0);
+    glDrawBuffer(GL_NONE);
+    glReadBuffer(GL_NONE);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    // lighting info
+    // -------------
+    glm::vec3 lightPos(-12.0f, 20.0f, 10.0f);
+    glm::vec3 lightColor(400.0f, 400.0f, 400.0f);
+
     // then before rendering, configure the viewport to the original framebuffer's screen dimensions
     int scrWidth, scrHeight;
     glfwGetFramebufferSize(window, &scrWidth, &scrHeight);
     glViewport(0, 0, scrWidth, scrHeight);
 
-    while (!glfwWindowShouldClose(window))
-    {
+    while (!glfwWindowShouldClose(window)) {
         // Start the Dear ImGui frame
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
@@ -704,8 +718,7 @@ int main()
             frameCount++;
 
             // 每 0.5 秒更新一次 FPS
-            if (timeAccumulator >= 0.5f)
-            {
+            if (timeAccumulator >= 0.5f) {
                 displayedFPS = frameCount / timeAccumulator;
                 displayedFrameTime = (displayedFPS > 0.0f)
                                          ? (1000.0f / displayedFPS)
@@ -729,13 +742,95 @@ int main()
         processInput(window);
 
         updatePlayerController(window, world, worldMutex);
-        if (g_playerPart)
-        {
+        if (g_playerPart) {
             std::shared_lock<UpgradeableMutex> lock(worldMutex);
             Vec3 p = castPositionToVec3(g_playerPart->getPosition());
             camera.Position = glm::vec3((float) p.x, (float) (p.y + g_playerEyeHeight * g_playerHeight), (float) p.z);
         }
 
+        for (auto it = g_bullets.begin(); it != g_bullets.end();) {
+            it->life -= deltaTime;
+            if (it->life <= 0) {
+                it = g_bullets.erase(it);
+            } else {
+                it->position += it->velocity * deltaTime;
+                ++it;
+            }
+        }
+
+        float near_plane = 0.10f, far_plane = 80.0f;
+        glm::vec3 lightTarget(lightPos.x, -10.0f, -5.0f);
+        glm::mat4 lightView = glm::lookAt(lightPos, lightTarget, glm::vec3(0.0f, 1.0f, 0.0f));
+
+        glm::vec4 floorCorners[] = {
+            glm::vec4(-floorSize, -10.0f, -floorSize, 1.0f),
+            glm::vec4( floorSize, -10.0f, -floorSize, 1.0f),
+            glm::vec4( floorSize, -10.0f,  floorSize, 1.0f),
+            glm::vec4(-floorSize, -10.0f,  floorSize, 1.0f)
+        };
+        glm::vec4 firstCorner = lightView * floorCorners[0];
+        float minX = firstCorner.x, maxX = firstCorner.x;
+        float minY = firstCorner.y, maxY = firstCorner.y;
+        for (int i = 1; i < 4; ++i) {
+            glm::vec4 corner = lightView * floorCorners[i];
+            if (corner.x < minX) minX = corner.x;
+            if (corner.x > maxX) maxX = corner.x;
+            if (corner.y < minY) minY = corner.y;
+            if (corner.y > maxY) maxY = corner.y;
+        }
+        glm::mat4 lightProjection = glm::ortho(minX, maxX, minY, maxY, near_plane, far_plane);
+        glm::mat4 lightSpaceMatrix = lightProjection * lightView;
+
+        // render depth map
+        // ------------------------------------------------------------------------------------------
+        simpleDepthShader.use();
+        simpleDepthShader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
+
+        glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
+        glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
+        glClear(GL_DEPTH_BUFFER_BIT);
+        glEnable(GL_CULL_FACE);
+        glCullFace(GL_FRONT);
+
+        {
+            std::shared_lock<UpgradeableMutex> lock(worldMutex);
+            world.forEachPart([&](const CustomPart &part) {
+                if (part.type == CustomPart::SPHERE || part.type == CustomPart::CUBE) {
+                    glm::mat4 m = toGlm(part.getCFrame().asMat4WithPreScale(part.hitbox.scale));
+                    simpleDepthShader.setMat4("model", m);
+                    part.type == CustomPart::SPHERE ? renderSphere() : renderCube();
+                } else if (part.type == CustomPart::PLANE) {
+                    glm::mat4 mNoScale = toGlm(part.getCFrame().asMat4());
+                    simpleDepthShader.setMat4("model", mNoScale);
+                    renderPlane(floorSize, floorUVScale);
+                }
+            });
+        }
+
+        for (const auto &b: g_bullets) {
+            glm::mat4 bulletModel = glm::mat4(1.0f);
+            bulletModel = glm::translate(bulletModel, b.position);
+
+            if (glm::length(b.velocity) > 0.001f) {
+                glm::vec3 direction = glm::normalize(b.velocity);
+                glm::vec3 up = glm::vec3(0, 1, 0);
+                if (abs(glm::dot(direction, up)) > 0.99f) up = glm::vec3(1, 0, 0);
+
+                glm::mat4 look = glm::lookAt(glm::vec3(0), direction, up);
+                bulletModel = bulletModel * glm::inverse(look);
+                bulletModel = glm::scale(bulletModel, glm::vec3(0.04f, 0.04f, 0.8f));
+            }
+
+            simpleDepthShader.setMat4("model", bulletModel);
+            renderCube();
+        }
+
+        glCullFace(GL_BACK);
+        glDisable(GL_CULL_FACE);
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+        glfwGetFramebufferSize(window, &scrWidth, &scrHeight);
+        glViewport(0, 0, scrWidth, scrHeight);
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -744,8 +839,17 @@ int main()
         pbrShader.use();
         glm::mat4 model = glm::mat4(1.0f);
         glm::mat4 view = camera.GetViewMatrix();
+        projection = glm::perspective(glm::radians(camera.Zoom), (float) scrWidth / (float) scrHeight, 0.1f, 1000.0f);
+        pbrShader.setMat4("projection", projection);
         pbrShader.setMat4("view", view);
+        pbrShader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
         pbrShader.setVec3("camPos", camera.Position);
+        pbrShader.setVec3("lightPositions[0]", lightPos);
+        pbrShader.setVec3("lightColors[0]", lightColor);
+        for (int i = 1; i < 4; ++i) {
+            pbrShader.setVec3("lightPositions[" + std::to_string(i) + "]", lightPos);
+            pbrShader.setVec3("lightColors[" + std::to_string(i) + "]", glm::vec3(0.0f));
+        }
 
         // bind pre-computed IBL data
         glActiveTexture(GL_TEXTURE0);
@@ -754,10 +858,11 @@ int main()
         glBindTexture(GL_TEXTURE_CUBE_MAP, prefilterMap);
         glActiveTexture(GL_TEXTURE2);
         glBindTexture(GL_TEXTURE_2D, brdfLUTTexture);
+        glActiveTexture(GL_TEXTURE8);
+        glBindTexture(GL_TEXTURE_2D, depthMap);
 
         // Texture Bindings Array
-        struct TextureSet
-        {
+        struct TextureSet {
             unsigned int albedo, normal, metallic, roughness, ao;
         };
         TextureSet textures[] = {
@@ -771,13 +876,11 @@ int main()
         // Sync with physics world
         {
             std::shared_lock<UpgradeableMutex> lock(worldMutex);
-            world.forEachPart([&](const CustomPart &part)
-            {
+            world.forEachPart([&](const CustomPart &part) {
                 // Determine textures
                 int matIdx = part.materialIndex;
 
-                if (matIdx >= 0 && matIdx < 5 && part.type != CustomPart::MODEL)
-                {
+                if (matIdx >= 0 && matIdx < 5 && part.type != CustomPart::MODEL) {
                     glActiveTexture(GL_TEXTURE3);
                     glBindTexture(GL_TEXTURE_2D, textures[matIdx].albedo);
                     glActiveTexture(GL_TEXTURE4);
@@ -808,24 +911,20 @@ int main()
                 glm::mat4 m = toGlm(part.getCFrame().asMat4WithPreScale(part.hitbox.scale));
 
                 // Render
-                if (part.type == CustomPart::SPHERE)
-                {
+                if (part.type == CustomPart::SPHERE) {
                     pbrShader.setMat4("model", m);
                     pbrShader.setMat3("normalMatrix", glm::transpose(glm::inverse(glm::mat3(m))));
                     renderSphere();
-                } else if (part.type == CustomPart::PLANE)
-                {
+                } else if (part.type == CustomPart::PLANE) {
                     glm::mat4 mNoScale = toGlm(part.getCFrame().asMat4());
                     pbrShader.setMat4("model", mNoScale);
                     pbrShader.setMat3("normalMatrix", glm::transpose(glm::inverse(glm::mat3(mNoScale))));
                     renderPlane(floorSize, floorUVScale);
-                } else if (part.type == CustomPart::WALL)
-                {
+                } else if (part.type == CustomPart::WALL) {
                     // pbrShader.setMat4("model", m);
                     // pbrShader.setMat3("normalMatrix", glm::transpose(glm::inverse(glm::mat3(m))));
                     // renderCube();
-                } else if (part.type == CustomPart::CUBE)
-                {
+                } else if (part.type == CustomPart::CUBE) {
                     pbrShader.setMat4("model", m);
                     pbrShader.setMat3("normalMatrix", glm::transpose(glm::inverse(glm::mat3(m))));
                     renderCube();
@@ -837,23 +936,9 @@ int main()
             });
         }
 
-        // Update and Render Bullets
+        // Render Bullets
         pbrShader.use();
-        for (auto it = g_bullets.begin(); it != g_bullets.end();)
-        {
-            it->life -= deltaTime;
-            if (it->life <= 0)
-            {
-                it = g_bullets.erase(it);
-            } else
-            {
-                it->position += it->velocity * deltaTime;
-                ++it;
-            }
-        }
-
-        if (!g_bullets.empty())
-        {
+        if (!g_bullets.empty()) {
             glActiveTexture(GL_TEXTURE3);
             glBindTexture(GL_TEXTURE_2D, yellowAlbedo);
             glActiveTexture(GL_TEXTURE4);
@@ -865,13 +950,11 @@ int main()
             glActiveTexture(GL_TEXTURE7);
             glBindTexture(GL_TEXTURE_2D, defaultAO);
 
-            for (const auto &b: g_bullets)
-            {
+            for (const auto &b: g_bullets) {
                 glm::mat4 model = glm::mat4(1.0f);
                 model = glm::translate(model, b.position);
 
-                if (glm::length(b.velocity) > 0.001f)
-                {
+                if (glm::length(b.velocity) > 0.001f) {
                     glm::vec3 direction = glm::normalize(b.velocity);
                     glm::vec3 up = glm::vec3(0, 1, 0);
                     if (abs(glm::dot(direction, up)) > 0.99f) up = glm::vec3(1, 0, 0);
@@ -920,7 +1003,15 @@ int main()
                     modelAOMap);
 
         // render BRDF map to screen
-        //brdfShader.Use();
+        // brdfShader.use();
+        // renderQuad();
+
+        // render shadow map to screen
+        shadowDebugShader.use();
+        shadowDebugShader.setFloat("near_plane", near_plane);
+        shadowDebugShader.setFloat("far_plane", far_plane);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, depthMap);
         //renderQuad();
 
         ImGui::Render();
@@ -937,8 +1028,7 @@ int main()
     return 0;
 }
 
-void processInput(GLFWwindow *window)
-{
+void processInput(GLFWwindow *window) {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
 
@@ -959,20 +1049,17 @@ void processInput(GLFWwindow *window)
     bool fireTriggered = fireNow && !g_firePressedLast;
     g_firePressedLast = fireNow;
 
-    if (fireTriggered && g_fireCooldown <= 0.0f)
-    {
+    if (fireTriggered && g_fireCooldown <= 0.0f) {
         shootRay(*g_world, *g_worldMutex);
         g_fireCooldown = 1.0f / g_fireRate;
     }
 }
 
-void mouse_callback(GLFWwindow *window, double xposIn, double yposIn)
-{
+void mouse_callback(GLFWwindow *window, double xposIn, double yposIn) {
     float xpos = static_cast<float>(xposIn);
     float ypos = static_cast<float>(yposIn);
 
-    if (firstMouse)
-    {
+    if (firstMouse) {
         lastX = xpos;
         lastY = ypos;
         firstMouse = false;
@@ -987,18 +1074,15 @@ void mouse_callback(GLFWwindow *window, double xposIn, double yposIn)
     camera.ProcessMouseMovement(xoffset, yoffset);
 }
 
-void scroll_callback(GLFWwindow *window, double xoffset, double yoffset)
-{
+void scroll_callback(GLFWwindow *window, double xoffset, double yoffset) {
     camera.ProcessMouseScroll(static_cast<float>(yoffset));
 }
 
-void framebuffer_size_callback(GLFWwindow *window, int width, int height)
-{
+void framebuffer_size_callback(GLFWwindow *window, int width, int height) {
     glViewport(0, 0, width, height);
 }
 
-bool isPlayerGrounded(World<CustomPart> &world, UpgradeableMutex &worldMutex)
-{
+bool isPlayerGrounded(World<CustomPart> &world, UpgradeableMutex &worldMutex) {
     if (!g_playerPart) return false;
 
     Vec3 center = castPositionToVec3(g_playerPart->getPosition());
@@ -1020,8 +1104,7 @@ bool isPlayerGrounded(World<CustomPart> &world, UpgradeableMutex &worldMutex)
     return true;
 }
 
-void updatePlayerController(GLFWwindow *window, World<CustomPart> &world, UpgradeableMutex &worldMutex)
-{
+void updatePlayerController(GLFWwindow *window, World<CustomPart> &world, UpgradeableMutex &worldMutex) {
     if (!g_playerPart) return;
 
     glm::vec3 forward = glm::normalize(glm::vec3(camera.Front.x, 0.0f, camera.Front.z));
@@ -1035,7 +1118,8 @@ void updatePlayerController(GLFWwindow *window, World<CustomPart> &world, Upgrad
 
     if (glm::length(wish) > 1e-5f) wish = glm::normalize(wish);
 
-    Vec3 curVelocity; {
+    Vec3 curVelocity;
+    {
         std::shared_lock<UpgradeableMutex> lock(worldMutex);
         curVelocity = g_playerPart->getVelocity();
     }
@@ -1050,8 +1134,7 @@ void updatePlayerController(GLFWwindow *window, World<CustomPart> &world, Upgrad
     bool jumpNow = glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS;
     bool jumpTriggered = jumpNow && !g_jumpPressedLast;
     g_jumpPressedLast = jumpNow;
-    if (jumpTriggered && isPlayerGrounded(world, worldMutex))
-    {
+    if (jumpTriggered && isPlayerGrounded(world, worldMutex)) {
         targetVel.y = g_playerJumpSpeed;
     }
 
@@ -1062,8 +1145,7 @@ void updatePlayerController(GLFWwindow *window, World<CustomPart> &world, Upgrad
     }
 }
 
-void shootRay(World<CustomPart> &world, UpgradeableMutex &worldMutex)
-{
+void shootRay(World<CustomPart> &world, UpgradeableMutex &worldMutex) {
     // Ray in world space from camera center
     glm::vec3 origin = camera.Position;
     glm::vec3 dir = glm::normalize(camera.Front);
@@ -1108,15 +1190,12 @@ void shootRay(World<CustomPart> &world, UpgradeableMutex &worldMutex)
     double bestT = hit.distance;
     Vec3 hitPos = rayOrigin + rayDir * bestT;
     Vec3 impulse = rayDir * g_fireImpulse;
-    try
-    {
-        if (bestPart->type != CustomPart::PLANE && bestPart->type != CustomPart::WALL)
-        {
+    try {
+        if (bestPart->type != CustomPart::PLANE && bestPart->type != CustomPart::WALL) {
             Vec3 partCenter = castPositionToVec3(bestPart->getCFrame().position);
             bestPart->applyImpulse(hitPos - partCenter, impulse);
         }
-    } catch (...)
-    {
+    } catch (...) {
         // ignore
     }
 
