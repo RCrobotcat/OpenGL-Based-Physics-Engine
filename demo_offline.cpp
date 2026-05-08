@@ -29,6 +29,7 @@
 #include <Physics3D/CollisionCast/collisionCast.h>
 #include <Physics3D/threading/physicsThread.h>
 #include <Physics3D/externalforces/directionalGravity.h>
+#include <Physics3D/constraints/hingeConstraint.h>
 
 #include "Physics3D/math/ray.h"
 #include "Common/utils.h"
@@ -396,6 +397,49 @@ int main() {
         world.addPart(part.get());
         parts.push_back(std::move(part));
     }
+
+    // Hinge constraint sample: two dynamic bars sharing one vertical hinge axis.
+    PartProperties hingeProperties = basicProperties;
+    hingeProperties.density = 10.0;
+    hingeProperties.bouncyness = 0.01;
+    const Vec3 hingeAxis(0.5, 1.0, 0.0);
+
+    auto hingeBarA = std::make_unique<CustomPart>(
+        boxShape(2, 2, 2),
+        GlobalCFrame(-12.0, 1.0, -6.0),
+        hingeProperties,
+        CustomPart::CUBE,
+        2
+    );
+    auto hingeBarB = std::make_unique<CustomPart>(
+        boxShape(2, 2, 2),
+        GlobalCFrame(-10.0, 1.0, -6.0),
+        hingeProperties,
+        CustomPart::CUBE,
+        3
+    );
+
+    CustomPart *hingeBarAPtr = hingeBarA.get();
+    CustomPart *hingeBarBPtr = hingeBarB.get();
+    world.addPart(hingeBarAPtr);
+    world.addPart(hingeBarBPtr);
+
+    ConstraintGroup hingeGroup;
+    hingeGroup.add(
+        hingeBarAPtr,
+        hingeBarBPtr,
+        new HingeConstraint(
+            Vec3(2.0, 0.0, 0.0),
+            hingeAxis,
+            Vec3(-2.0, 0.0, 0.0),
+            hingeAxis
+        )
+    );
+    world.constraints.push_back(std::move(hingeGroup));
+
+    hingeBarBPtr->applyImpulse(Vec3(0.0, 0.0, 0.0), Vec3(0.0, 0.0, 80.0));
+    parts.push_back(std::move(hingeBarA));
+    parts.push_back(std::move(hingeBarB));
 
     // Player capsule
     PartProperties playerProperties;
