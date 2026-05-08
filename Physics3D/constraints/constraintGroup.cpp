@@ -57,6 +57,7 @@ void ConstraintGroup::apply() const {
 		numberOfParams += constraintMatrices[i].getSize();
 	}
 
+	// Kλ = b 中的 b
 	UnmanagedHorizontalFixedMatrix<double, NUMBER_OF_ERROR_DERIVATIVES> vectorToSolve(errorBuffer, maxNumberOfParameters);
 
 	LargeMatrix<double> systemToSolve(numberOfParams, numberOfParams);
@@ -68,6 +69,7 @@ void ConstraintGroup::apply() const {
 			MotorizedPhysical* mPhysA = constraints[blockCol].physA->mainPhysical;
 			MotorizedPhysical* mPhysB = constraints[blockCol].physB->mainPhysical;
 
+			// get Jacobian Matrices
 			const UnmanagedHorizontalFixedMatrix<double, 6> motionToEq1 = constraintMatrices[blockCol].getMotionToEquationMatrixA();
 			const UnmanagedHorizontalFixedMatrix<double, 6> motionToEq2 = constraintMatrices[blockCol].getMotionToEquationMatrixB();
 
@@ -75,17 +77,28 @@ void ConstraintGroup::apply() const {
 			for(std::size_t blockRow = 0; blockRow < constraints.size(); blockRow++) {
 				int rowSize = constraintMatrices[blockRow].getSize();
 
+				// 约束的两个刚体
 				MotorizedPhysical* cPhysA = constraints[blockRow].physA->mainPhysical;
 				MotorizedPhysical* cPhysB = constraints[blockRow].physB->mainPhysical;
 
+				// 刚体运动变化 [Δv, Δω]^T
 				const UnmanagedVerticalFixedMatrix<double, 6> paramToMotion1 = constraintMatrices[blockRow].getParameterToMotionMatrixA();
 				const UnmanagedVerticalFixedMatrix<double, 6> paramToMotion2 = constraintMatrices[blockRow].getParameterToMotionMatrixB();
 
-				double resultBuf1[6 * 6]; UnmanagedLargeMatrix<double> resultMat1(resultBuf1, rowSize, colSize);
+				double resultBuf1[6 * 6];
+				UnmanagedLargeMatrix<double> resultMat1(resultBuf1, rowSize, colSize);
 				for(double& d : resultMat1) d = 0.0;
-				double resultBuf2[6 * 6]; UnmanagedLargeMatrix<double> resultMat2(resultBuf2, rowSize, colSize);
+
+				double resultBuf2[6 * 6];
+				UnmanagedLargeMatrix<double> resultMat2(resultBuf2, rowSize, colSize);
 				for(double& d : resultMat2) d = 0.0;
+
+				// 两个约束之间只有共享同一个刚体时，才会互相影响
+				// e.g 约束 C1 作用在刚体 A、B, 约束 C2 作用在刚体 B、C
+				// 两个约束作用在完全不同的刚体上: C1: A-B, C2: C-D => 不会互相影响
 				if(mPhysA == cPhysA) {
+					// J_i * M^{-1} * J_j^T == Kλ
+					// motionToEq ≈ J, paramToMotion ≈ M^{-1}J^T
 					inMemoryMatrixMultiply(motionToEq1, paramToMotion1, resultMat1);
 				} else if(mPhysA == cPhysB) {
 					inMemoryMatrixMultiply(motionToEq1, paramToMotion2, resultMat1);
@@ -110,6 +123,7 @@ void ConstraintGroup::apply() const {
 
 	assert(isMatValid(vectorToSolve));
 
+	// 求解 Kλ = b，解出的 λ 存回 vectorToSolve
 	destructiveSolve(systemToSolve, vectorToSolve);
 
 	assert(isMatValid(vectorToSolve));
@@ -122,6 +136,7 @@ void ConstraintGroup::apply() const {
 			std::size_t curSize = curP2MA.cols;
 
 			UnmanagedHorizontalFixedMatrix<double, NUMBER_OF_ERROR_DERIVATIVES> parameterVec = vectorToSolve.subRows(curParameterIndex, curSize);
+			// 将解出的 parameterVec (λ) 乘回响应矩阵
 			Matrix<double, 6, NUMBER_OF_ERROR_DERIVATIVES> effectOnA = curP2MA * parameterVec;
 			Matrix<double, 6, NUMBER_OF_ERROR_DERIVATIVES> effectOnB = -(curP2MB * parameterVec);
 
@@ -134,11 +149,13 @@ void ConstraintGroup::apply() const {
 
 			GlobalCFrame& mainPACF = constraints[i].physA->mainPhysical->rigidBody.mainPart->cframe;
 			GlobalCFrame& mainPBCF = constraints[i].physB->mainPhysical->rigidBody.mainPart->cframe;
+			// 修正位置和旋转
 			mainPACF.position += offsetAngularEffectOnA.getSubVector<3>(0);
 			mainPACF.rotation = Rotation::fromRotationVector(offsetAngularEffectOnA.getSubVector<3>(3)) * mainPACF.rotation;
 			mainPBCF.position += offsetAngularEffectOnB.getSubVector<3>(0);
 			mainPBCF.rotation = Rotation::fromRotationVector(offsetAngularEffectOnB.getSubVector<3>(3)) * mainPBCF.rotation;
 
+			// 修正线速度和角速度
 			Vector<double, 6> velAngularEffectOnA = effectOnA.getCol(1);
 			Vector<double, 6> velAngularEffectOnB = effectOnB.getCol(1);
 			assert(isVecValid(velAngularEffectOnA));

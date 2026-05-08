@@ -30,9 +30,10 @@ namespace P3D {
         // 刚体运动变化 [Δv, Δω]^T
         // 上半部分是线速度响应 Δv = F / m
         // 下半部分是角速度响应 Δω = I^{-1} N
+        // 等同于 M^{-1}J^T
         Matrix<double, 6, 5> parameterToMotion = joinVertical(impulseToMotion, phys.momentResponse * angularEffect);
 
-        // 把刚体的线速度和角速度投影到 5 个约束方程上
+        // 雅可比矩阵 J
         Matrix<double, 5, 6> motionToEquation = join(Mat3::IDENTITY(), -crossEquivAttach,
                                                      Matrix<double, 2, 3>::ZEROS(),
                                                      Matrix<double, 2, 3>::fromRows({p1, p2}));
@@ -40,6 +41,10 @@ namespace P3D {
         return ConstraintMatrixPair<5>{parameterToMotion, motionToEquation};
     }
 
+    /// <summary>
+    /// 几何约束: 两个刚体通过铰链连接，只允许绕同一根轴相对旋转.
+    /// 这个函数将几何约束转换成 5 维约束方程及其雅可比矩阵，供物理求解器计算修正冲量
+    /// </summary>
     ConstraintMatrixPack HingeConstraint::getMatrices(const PhysicalInfo &physA, const PhysicalInfo &physB,
                                                       double *matrixBuf, double *errorBuf) const {
         // 构造局部坐标系
@@ -74,6 +79,7 @@ namespace P3D {
         Vec5 error0 = join(Vec3(physB.cframe.localToGlobal(attachB) - physA.cframe.localToGlobal(attachA)),
                            Vec2(rotationOffsetP1, rotationOffsetP2));
 
+        // 雅可比约束形式 J * V
         Vec5 velocityA = cA.motionToEquation * physA.motion.getDerivAsVec6(0);
         Vec5 velocityB = cB.motionToEquation * physB.motion.getDerivAsVec6(0);
         Vec5 error1 = velocityB - velocityA;
