@@ -16,6 +16,7 @@
 
 #include "PhysicsCommon.h"
 #include "Physics3D/CollisionCast/collisionCast.h"
+#include "Physics3D/constraints/hingeConstraint.h"
 
 using namespace P3D;
 
@@ -268,6 +269,54 @@ private:
             m_world.addPart(part.get());
             m_dynamicObjects.push_back(std::move(part));
         }
+
+        // Hinge constraint sample: two dynamic cubes sharing one vertical hinge axis.
+        PartProperties hingeProperties = m_dynamicObjectProperties;
+        hingeProperties.density = 10.0;
+        hingeProperties.bouncyness = 0.01;
+        const Vec3 hingeAxis(0.0, 1.0, 0.0);
+
+        auto hingeBarA = std::make_unique<ServerEntityPart>(
+            boxShape(2, 2, 2),
+            GlobalCFrame(-12.0, 1.0, -6.0),
+            hingeProperties,
+            ServerEntityPart::CUBE
+        );
+        hingeBarA->dynamicObjectID = m_nextDynamicObjectID++;
+        hingeBarA->dynamicShapeType = static_cast<uint8_t>(DynamicObjectShape::Cube);
+        hingeBarA->materialIndex = 2.0;
+
+        auto hingeBarB = std::make_unique<ServerEntityPart>(
+            boxShape(2, 2, 2),
+            GlobalCFrame(-10.0, 1.0, -6.0),
+            hingeProperties,
+            ServerEntityPart::CUBE
+        );
+        hingeBarB->dynamicObjectID = m_nextDynamicObjectID++;
+        hingeBarB->dynamicShapeType = static_cast<uint8_t>(DynamicObjectShape::Cube);
+        hingeBarB->materialIndex = 3.0;
+
+        ServerEntityPart *hingeBarAPtr = hingeBarA.get();
+        ServerEntityPart *hingeBarBPtr = hingeBarB.get();
+        m_world.addPart(hingeBarAPtr);
+        m_world.addPart(hingeBarBPtr);
+
+        ConstraintGroup hingeGroup;
+        hingeGroup.add(
+            hingeBarAPtr,
+            hingeBarBPtr,
+            new HingeConstraint(
+                Vec3(2.0, 0.0, 0.0),
+                hingeAxis,
+                Vec3(-2.0, 0.0, 0.0),
+                hingeAxis
+            )
+        );
+        m_world.constraints.push_back(std::move(hingeGroup));
+
+        hingeBarBPtr->applyImpulse(Vec3(0.0, 0.0, 0.0), Vec3(0.0, 0.0, 80.0));
+        m_dynamicObjects.push_back(std::move(hingeBarA));
+        m_dynamicObjects.push_back(std::move(hingeBarB));
     }
 
     GlobalCFrame makeSpawnCFrame(uint32_t playerID) const

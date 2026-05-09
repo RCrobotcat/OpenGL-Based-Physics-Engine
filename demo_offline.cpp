@@ -398,11 +398,11 @@ int main() {
         parts.push_back(std::move(part));
     }
 
-    // Hinge constraint sample: two dynamic bars sharing one vertical hinge axis.
+    // Hinge constraint sample: two dynamic cubes sharing one vertical hinge axis.
     PartProperties hingeProperties = basicProperties;
     hingeProperties.density = 10.0;
     hingeProperties.bouncyness = 0.01;
-    const Vec3 hingeAxis(0.5, 1.0, 0.0);
+    const Vec3 hingeAxis(0.0, 1.0, 0.0);
 
     auto hingeBarA = std::make_unique<CustomPart>(
         boxShape(2, 2, 2),
